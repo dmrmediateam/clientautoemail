@@ -1,0 +1,110 @@
+<%
+  const title = client.name;
+  const webhookUrl = publicBaseUrl + '/v1/webhooks/incoming/' + client.id;
+  function statusBadge(s) {
+    if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
+    if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
+    if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
+    return '<span class="badge badge-off">' + s + '</span>';
+  }
+%>
+<%- include('_header', { brand, page, flash, title }) %>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <div>
+    <h1><%= client.name %></h1>
+    <p class="lede">
+      <% if (client.active) { %><span class="badge badge-on">Active</span>
+      <% } else { %><span class="badge badge-off">Paused</span><% } %>
+      <% if (client.google.connected) { %><span class="badge badge-on">Gmail Connected</span>
+      <% } else { %><span class="badge badge-warn">Gmail Not Connected</span><% } %>
+      <% if (client.website) { %> · <span class="mono" style="font-size:13px"><%= client.website %></span><% } %>
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/admin/clients/<%= client.id %>/edit">Edit</a>
+    <% if (client.google.connected) { %>
+      <form action="/auth/google/disconnect/<%= client.id %>" method="post" style="display:inline">
+        <button class="btn" type="submit">Disconnect Gmail</button>
+      </form>
+    <% } else { %>
+      <a class="btn btn-primary" href="/auth/google/start/<%= client.id %>">Connect Gmail</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Webhook URL</h2>
+  <p class="lede">Paste this into Luxury Presence as the destination for this client's leads.</p>
+  <div class="code-block"><%= webhookUrl %></div>
+  <p class="help">Method: POST · Content-Type: application/json</p>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Identity</h2>
+  <div class="kv">
+    <div class="k">Agent name</div><div class="v"><%= client.agent_name %></div>
+    <div class="k">From email</div><div class="v mono"><%= client.agent_email %></div>
+    <div class="k">Phone</div><div class="v"><%= client.agent_phone || '—' %></div>
+    <div class="k">Connected Gmail</div><div class="v mono"><%= client.google.email || '—' %></div>
+    <div class="k">SendGrid key</div>
+    <div class="v">
+      <% if (client.sendgrid_api_key) { %><span class="badge badge-on">Per-client</span>
+      <% } else { %><span class="badge badge-off">Master fallback</span><% } %>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Template</h2>
+  <div class="kv">
+    <div class="k">Subject</div><div class="v mono"><%= client.template.subject %></div>
+    <div class="k">Body</div><div class="v"><pre class="code-block"><%= client.template.body %></pre></div>
+  </div>
+  <p class="help">Available placeholders: <span class="mono">{{first_name}} {{last_name}} {{full_name}} {{email}} {{phone}} {{property_address}} {{property_url}} {{message}} {{agent_name}} {{agent_phone}}</span></p>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Send a test</h2>
+  <form action="/admin/clients/<%= client.id %>/test" method="post">
+    <label>Recipient email</label>
+    <input class="input" type="email" name="to" value="<%= client.agent_email %>" />
+    <p class="help">A sample lead is generated and sent through the same pipeline a real webhook uses.</p>
+    <div class="actions" style="margin-top:14px">
+      <button type="submit" class="btn btn-primary" <%= !client.google.connected ? 'disabled' : '' %>>Send test email</button>
+      <% if (!client.google.connected) { %><span class="help">Connect Gmail first.</span><% } %>
+    </div>
+  </form>
+</div>
+
+<h2>Recent leads</h2>
+<div class="panel">
+  <% if (recent.length === 0) { %>
+    <div class="empty">No leads yet.</div>
+  <% } else { %>
+    <table>
+      <thead><tr><th>When</th><th>Lead</th><th>Subject</th><th>Status</th><th>Message ID / Error</th></tr></thead>
+      <tbody>
+        <% recent.forEach(l => { %>
+          <tr>
+            <td class="mono" style="font-size:12px"><%= new Date(l.created_at).toLocaleString() %></td>
+            <td><%= l.email_to || '—' %></td>
+            <td><%= l.subject %></td>
+            <td><%- statusBadge(l.status) %></td>
+            <td class="mono" style="font-size:12px;color:var(--fg-muted)"><%= l.message_id || l.error || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<div class="panel" style="border-color: rgba(248,113,113,.3)">
+  <h2 style="margin-top:0;color:var(--error)">Danger zone</h2>
+  <form action="/admin/clients/<%= client.id %>/delete" method="post"
+        onsubmit="return confirm('Delete <%= client.name.replace(/'/g, "\\'") %> and all its lead history? This cannot be undone.');">
+    <button class="btn btn-danger" type="submit">Delete client</button>
+  </form>
+</div>
+
+<%- include('_footer') %>

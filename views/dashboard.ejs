@@ -1,0 +1,89 @@
+<% const title = 'Dashboard'; %>
+<%- include('_header', { brand, page, flash, title }) %>
+
+<h1>Dashboard</h1>
+<p class="lede">Live view of webhook activity across all connected clients.</p>
+
+<div class="cards">
+  <div class="card"><div class="label">Total leads</div><div class="value"><%= stats.total || 0 %></div></div>
+  <div class="card"><div class="label">Sent</div><div class="value success"><%= stats.sent || 0 %></div></div>
+  <div class="card"><div class="label">Fallback</div><div class="value warning"><%= stats.fallback || 0 %></div></div>
+  <div class="card"><div class="label">Failed</div><div class="value error"><%= stats.failed || 0 %></div></div>
+</div>
+
+<h2>Clients</h2>
+<div class="panel">
+  <% if (clients.length === 0) { %>
+    <div class="empty">No clients yet. <a href="/admin/clients/new">Add your first client</a> to get started.</div>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr><th>Client</th><th>Agent</th><th>Gmail</th><th>Webhook URL</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% clients.forEach(c => { %>
+          <tr>
+            <td>
+              <strong><%= c.name %></strong>
+              <% if (c.website) { %>
+                <div class="mono" style="color:var(--fg-muted);font-size:12px"><%= c.website %></div>
+              <% } %>
+            </td>
+            <td>
+              <%= c.agent_name %><br>
+              <span class="mono" style="color:var(--fg-muted);font-size:12px"><%= c.agent_email %></span>
+            </td>
+            <td>
+              <% if (c.google.connected) { %>
+                <span class="badge badge-on">Connected</span>
+              <% } else { %>
+                <span class="badge badge-warn">Not connected</span>
+              <% } %>
+            </td>
+            <td class="mono" style="font-size:12px;color:var(--fg-muted);max-width:280px;overflow-x:auto">
+              <%= publicBaseUrl %>/v1/webhooks/incoming/<%= c.id %>
+            </td>
+            <td>
+              <% if (c.active) { %><span class="badge badge-on">Active</span>
+              <% } else { %><span class="badge badge-off">Paused</span><% } %>
+            </td>
+            <td><a class="btn" href="/admin/clients/<%= c.id %>">Open</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<h2>Recent activity</h2>
+<div class="panel">
+  <% if (recentLeads.length === 0) { %>
+    <div class="empty">No leads received yet. Webhooks will appear here.</div>
+  <% } else { %>
+    <table>
+      <thead><tr><th>When</th><th>Client</th><th>Lead</th><th>Status</th><th>Message ID</th></tr></thead>
+      <tbody>
+        <% recentLeads.forEach(l => { %>
+          <tr>
+            <td class="mono" style="font-size:12px"><%= new Date(l.created_at).toLocaleString() %></td>
+            <td><%= l.client_name || l.client_id %></td>
+            <td><%= l.email_to || '—' %></td>
+            <td><%- statusBadge(l.status) %></td>
+            <td class="mono" style="font-size:12px;color:var(--fg-muted)"><%= l.message_id || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<%
+  function statusBadge(s) {
+    if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
+    if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
+    if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
+    return '<span class="badge badge-off">' + s + '</span>';
+  }
+%>
+
+<%- include('_footer') %>

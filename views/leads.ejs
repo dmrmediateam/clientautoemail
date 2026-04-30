@@ -1,0 +1,37 @@
+<%
+  const title = 'Leads';
+  function statusBadge(s) {
+    if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
+    if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
+    if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
+    return '<span class="badge badge-off">' + s + '</span>';
+  }
+%>
+<%- include('_header', { brand, page, flash, title }) %>
+
+<h1>Leads</h1>
+<p class="lede">Most recent 100 webhook deliveries across all clients.</p>
+
+<div class="panel">
+  <% if (leads.length === 0) { %>
+    <div class="empty">No leads yet.</div>
+  <% } else { %>
+    <table>
+      <thead><tr><th>When</th><th>Client</th><th>Lead</th><th>Subject</th><th>Status</th><th>Message ID / Error</th></tr></thead>
+      <tbody>
+        <% leads.forEach(l => { %>
+          <tr>
+            <td class="mono" style="font-size:12px"><%= new Date(l.created_at).toLocaleString() %></td>
+            <td><%= l.client_name || l.client_id %></td>
+            <td><%= l.email_to || '—' %></td>
+            <td><%= l.subject %></td>
+            <td><%- statusBadge(l.status) %></td>
+            <td class="mono" style="font-size:12px;color:var(--fg-muted)"><%= l.message_id || l.error || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<%- include('_footer') %>

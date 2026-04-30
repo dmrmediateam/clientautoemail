@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm start *)",
+      "Bash(echo \"started pid=$!\")"
+    ]
+  }
+}

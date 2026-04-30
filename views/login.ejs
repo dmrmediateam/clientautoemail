@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in — <%= brand.name %></title>
+<link rel="stylesheet" href="/static/css/dmr.css" />
+</head>
+<body>
+<div class="auth-shell">
+  <div class="panel auth-card">
+    <div class="brand" style="margin-bottom:18px">
+      <div class="brand-mark">DMR</div>
+      <div class="brand-text">
+        <span class="name"><%= brand.name %></span>
+        <span class="tagline"><%= brand.tagline %></span>
+      </div>
+    </div>
+    <h1>Sign in</h1>
+    <p class="lede">Admin access only.</p>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="flash flash-error"><%= error %></div>
+    <% } %>
+
+    <form action="/login" method="post">
+      <input type="hidden" name="next" value="<%= next %>" />
+      <label>Username</label>
+      <input class="input" name="username" autocomplete="username" required />
+      <label>Password</label>
+      <input class="input" type="password" name="password" autocomplete="current-password" required />
+      <div class="actions" style="margin-top:18px">
+        <button class="btn btn-primary" type="submit">Sign in</button>
+      </div>
+    </form>
+  </div>
+</div>
+</body>
+</html>

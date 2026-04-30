@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+.vscode/
+.idea/
+dist/
+build/
+coverage/

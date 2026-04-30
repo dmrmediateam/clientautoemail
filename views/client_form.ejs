@@ -1,0 +1,70 @@
+<%
+  const action = isNew ? '/admin/clients' : ('/admin/clients/' + client.id);
+  const title = isNew ? 'New client' : ('Edit ' + client.name);
+%>
+<%- include('_header', { brand, page, flash, title }) %>
+
+<h1><%= title %></h1>
+<p class="lede">
+  <% if (isNew) { %>
+    Add a new agent or brokerage. After saving, you'll connect their Gmail.
+  <% } else { %>
+    Update client identity, template, or status.
+  <% } %>
+</p>
+
+<form action="<%= action %>" method="post" class="panel">
+  <h2 style="margin-top:0">Client</h2>
+  <div class="row">
+    <div>
+      <label>Client / Brokerage name <span class="req">*</span></label>
+      <input class="input" name="name" required value="<%= client.name %>" placeholder="Marquis Farwell Homes" />
+    </div>
+    <div>
+      <label>Website</label>
+      <input class="input" name="website" value="<%= client.website %>" placeholder="marquisfarwellhomes.com" />
+    </div>
+  </div>
+
+  <h2>Agent identity</h2>
+  <div class="row">
+    <div>
+      <label>Agent name <span class="req">*</span></label>
+      <input class="input" name="agent_name" required value="<%= client.agent_name %>" placeholder="Marquis Farwell" />
+    </div>
+    <div>
+      <label>Agent email <span class="req">*</span></label>
+      <input class="input" type="email" name="agent_email" required value="<%= client.agent_email %>" placeholder="marquis@marquisfarwellhomes.com" />
+      <p class="help">Must match the Gmail account they'll authorize. Also used as Reply-To.</p>
+    </div>
+  </div>
+  <label>Agent phone</label>
+  <input class="input" name="agent_phone" value="<%= client.agent_phone %>" placeholder="(555) 123-4567" />
+
+  <h2>Email template</h2>
+  <label>Subject <span class="req">*</span></label>
+  <input class="input" name="template_subject" required value="<%= client.template.subject %>" />
+  <label>Body <span class="req">*</span></label>
+  <textarea class="textarea" name="template_body" rows="12" required><%= client.template.body %></textarea>
+  <p class="help">Plain text only. Placeholders: <span class="mono">{{first_name}} {{full_name}} {{email}} {{phone}} {{property_address}} {{property_url}} {{message}} {{agent_name}} {{agent_phone}}</span></p>
+
+  <h2>Delivery (optional)</h2>
+  <label>SendGrid API key (per-client override)</label>
+  <input class="input" name="sendgrid_api_key" value="<%= client.sendgrid_api_key || '' %>" placeholder="leave blank to use master key" />
+  <p class="help">If blank, the system master key is used. Per-client keys are stored encrypted (AES-256-GCM).</p>
+
+  <% if (!isNew) { %>
+    <h2>Status</h2>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" name="active" <%= client.active ? 'checked' : '' %> />
+      <span>Active — accept and dispatch webhooks</span>
+    </label>
+  <% } %>
+
+  <div class="actions" style="margin-top:24px">
+    <button type="submit" class="btn btn-primary"><%= isNew ? 'Create client' : 'Save changes' %></button>
+    <a class="btn" href="<%= isNew ? '/admin' : '/admin/clients/' + client.id %>">Cancel</a>
+  </div>
+</form>
+
+<%- include('_footer') %>
