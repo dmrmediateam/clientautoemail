@@ -1,0 +1,114 @@
+<%
+  const title = 'Template';
+  const page = 'template';
+%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title><%= title %> — <%= brand.name %> · <%= brand.tagline %></title>
+<link rel="stylesheet" href="/static/css/dmr.css" />
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">DMR</div>
+      <div class="brand-text">
+        <span class="name"><%= brand.name %></span>
+        <span class="tagline"><%= brand.tagline %></span>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>">Dashboard</a>
+      <a href="/dashboard/template" class="<%= page === 'template' ? 'active' : '' %>">Template</a>
+      <span style="color:var(--fg-muted);font-size:12px;margin:0 6px"><%= client.google.email || client.agent_email %></span>
+      <form action="/auth/logout" method="post" style="display:inline">
+        <button class="btn btn-ghost" type="submit">Sign out</button>
+      </form>
+    </nav>
+  </header>
+  <main class="main">
+  <% if (typeof flash !== 'undefined' && flash) { %>
+    <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
+  <% } %>
+
+<h1>Email template</h1>
+<p class="lede">Set separate templates for buyer and seller leads, plus your business-hour sending window.</p>
+
+<form action="/dashboard/template" method="post" class="panel">
+  <h2 style="margin-top:0">Buyer template</h2>
+  <label>Buyer subject <span class="req">*</span></label>
+  <input class="input" name="buyer_template_subject" required value="<%= client.templates?.buyer?.subject || client.template.subject %>" />
+
+  <label>Buyer body <span class="req">*</span></label>
+  <textarea class="textarea" name="buyer_template_body" rows="8" required><%= client.templates?.buyer?.body || client.template.body %></textarea>
+
+  <h2>Seller template</h2>
+  <label>Seller subject <span class="req">*</span></label>
+  <input class="input" name="seller_template_subject" required value="<%= client.templates?.seller?.subject || client.template.subject %>" />
+
+  <label>Seller body <span class="req">*</span></label>
+  <textarea class="textarea" name="seller_template_body" rows="8" required><%= client.templates?.seller?.body || client.template.body %></textarea>
+
+  <h2>Send window</h2>
+  <div class="row">
+    <div>
+      <label>Start (HH:MM, 24h)</label>
+      <input class="input" name="send_window_start" value="<%= client.settings?.send_window_start || '08:30' %>" />
+    </div>
+    <div>
+      <label>End (HH:MM, 24h)</label>
+      <input class="input" name="send_window_end" value="<%= client.settings?.send_window_end || '18:00' %>" />
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>Timezone (IANA)</label>
+      <input class="input" name="timezone" value="<%= client.settings?.timezone || 'America/Chicago' %>" />
+    </div>
+    <div>
+      <label>Daily send cap</label>
+      <input class="input" type="number" min="1" max="250" name="daily_send_limit" value="<%= client.settings?.daily_send_limit || 5 %>" />
+    </div>
+  </div>
+
+  <p class="help">
+    <strong>Available placeholders:</strong>
+    <span class="mono">{{first_name}}</span>
+    <span class="mono">{{last_name}}</span>
+    <span class="mono">{{full_name}}</span>
+    <span class="mono">{{email}}</span>
+    <span class="mono">{{phone}}</span>
+    <span class="mono">{{property_address}}</span>
+    <span class="mono">{{property_url}}</span>
+    <span class="mono">{{message}}</span>
+    <span class="mono">{{agent_name}}</span>
+    <span class="mono">{{agent_phone}}</span>
+  </p>
+
+  <div class="actions" style="margin-top:20px">
+    <button type="submit" class="btn btn-primary">Save template</button>
+    <a class="btn" href="/dashboard">Cancel</a>
+  </div>
+</form>
+
+<div class="panel">
+  <h2 style="margin-top:0">Tips for good lead emails</h2>
+  <ul style="color:var(--fg-muted);line-height:1.8;padding-left:20px;margin:0">
+    <li>Plain text only — no HTML, no images. Looks like a personal email, not a marketing blast.</li>
+    <li>Keep it under 5 sentences. Long emails read as automated.</li>
+    <li>End with a single, clear question (e.g. "When works best for you?").</li>
+    <li>Sign with your name and phone — replies will come straight to your Gmail inbox.</li>
+  </ul>
+</div>
+
+  </main>
+  <footer class="foot">
+    <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
+    <span class="mono"><%= brand.domain %></span>
+  </footer>
+</div>
+</body>
+</html>

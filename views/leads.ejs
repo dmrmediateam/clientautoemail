@@ -1,11 +1,11 @@
 <%
   const title = 'Leads';
-  function statusBadge(s) {
+  const statusBadge = (s) => {
     if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
     if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
     if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
     return '<span class="badge badge-off">' + s + '</span>';
-  }
+  };
 %>
 <%- include('_header', { brand, page, flash, title }) %>
 

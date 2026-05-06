@@ -20,18 +20,22 @@ function flashFromQuery(req) {
   return null;
 }
 
-router.get('/', (req, res) => {
-  const clients = clientsRepo.findAll();
-  const stats = leadsRepo.counts();
-  const recentLeads = leadsRepo.recent(15);
-  res.render('dashboard', {
-    page: 'dashboard',
-    clients,
-    stats,
-    recentLeads,
-    flash: flashFromQuery(req),
-    publicBaseUrl: config.publicBaseUrl,
-  });
+router.get('/', async (req, res, next) => {
+  try {
+    const [clients, stats, recentLeads] = await Promise.all([
+      clientsRepo.findAll(),
+      leadsRepo.counts(),
+      leadsRepo.recent(15),
+    ]);
+    res.render('dashboard', {
+      page: 'dashboard',
+      clients,
+      stats,
+      recentLeads,
+      flash: flashFromQuery(req),
+      publicBaseUrl: config.publicBaseUrl,
+    });
+  } catch (err) { next(err); }
 });
 
 router.get('/clients/new', (req, res) => {
@@ -48,101 +52,115 @@ router.get('/clients/new', (req, res) => {
   });
 });
 
-router.post('/clients', (req, res) => {
-  const b = req.body;
-  const created = clientsRepo.create({
-    name: (b.name || '').trim(),
-    website: (b.website || '').trim(),
-    agent_name: (b.agent_name || '').trim(),
-    agent_email: (b.agent_email || '').trim(),
-    agent_phone: (b.agent_phone || '').trim(),
-    sendgrid_api_key: (b.sendgrid_api_key || '').trim() || null,
-    template_subject: (b.template_subject || '').trim(),
-    template_body: b.template_body || '',
-  });
-  res.redirect(`/admin/clients/${created.id}?created=1`);
+router.post('/clients', async (req, res, next) => {
+  try {
+    const b = req.body;
+    const created = await clientsRepo.create({
+      name: (b.name || '').trim(),
+      website: (b.website || '').trim(),
+      agent_name: (b.agent_name || '').trim(),
+      agent_email: (b.agent_email || '').trim(),
+      agent_phone: (b.agent_phone || '').trim(),
+      sendgrid_api_key: (b.sendgrid_api_key || '').trim() || null,
+      template_subject: (b.template_subject || '').trim(),
+      template_body: b.template_body || '',
+    });
+    res.redirect(`/admin/clients/${created.id}?created=1`);
+  } catch (err) { next(err); }
 });
 
-router.get('/clients/:id', (req, res) => {
-  const client = clientsRepo.findById(req.params.id);
-  if (!client) return res.status(404).send('Client not found');
-  const recent = leadsRepo.recentForClient(client.id, 25);
-  res.render('client_detail', {
-    page: 'clients',
-    client,
-    recent,
-    flash: flashFromQuery(req),
-    publicBaseUrl: config.publicBaseUrl,
-  });
+router.get('/clients/:id', async (req, res, next) => {
+  try {
+    const client = await clientsRepo.findById(req.params.id);
+    if (!client) return res.status(404).send('Client not found');
+    const recent = await leadsRepo.recentForClient(client.id, 25);
+    res.render('client_detail', {
+      page: 'clients',
+      client,
+      recent,
+      flash: flashFromQuery(req),
+      publicBaseUrl: config.publicBaseUrl,
+    });
+  } catch (err) { next(err); }
 });
 
-router.get('/clients/:id/edit', (req, res) => {
-  const client = clientsRepo.findById(req.params.id);
-  if (!client) return res.status(404).send('Client not found');
-  res.render('client_form', {
-    page: 'clients',
-    client,
-    isNew: false,
-    flash: null,
-    publicBaseUrl: config.publicBaseUrl,
-  });
+router.get('/clients/:id/edit', async (req, res, next) => {
+  try {
+    const client = await clientsRepo.findById(req.params.id);
+    if (!client) return res.status(404).send('Client not found');
+    res.render('client_form', {
+      page: 'clients',
+      client,
+      isNew: false,
+      flash: null,
+      publicBaseUrl: config.publicBaseUrl,
+    });
+  } catch (err) { next(err); }
 });
 
-router.post('/clients/:id', (req, res) => {
-  const id = req.params.id;
-  const b = req.body;
-  const patch = {
-    name: b.name?.trim(),
-    website: b.website?.trim(),
-    agent_name: b.agent_name?.trim(),
-    agent_email: b.agent_email?.trim(),
-    agent_phone: b.agent_phone?.trim(),
-    template_subject: b.template_subject?.trim(),
-    template_body: b.template_body,
-    active: b.active === 'on' || b.active === '1' || b.active === true,
-  };
-  if (b.sendgrid_api_key !== undefined) {
-    patch.sendgrid_api_key = b.sendgrid_api_key.trim() || null;
-  }
-  clientsRepo.update(id, patch);
-  res.redirect(`/admin/clients/${id}?updated=1`);
+router.post('/clients/:id', async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const b = req.body;
+    const patch = {
+      name: b.name?.trim(),
+      website: b.website?.trim(),
+      agent_name: b.agent_name?.trim(),
+      agent_email: b.agent_email?.trim(),
+      agent_phone: b.agent_phone?.trim(),
+      template_subject: b.template_subject?.trim(),
+      template_body: b.template_body,
+      active: b.active === 'on' || b.active === '1' || b.active === true,
+    };
+    if (b.sendgrid_api_key !== undefined) {
+      patch.sendgrid_api_key = b.sendgrid_api_key.trim() || null;
+    }
+    await clientsRepo.update(id, patch);
+    res.redirect(`/admin/clients/${id}?updated=1`);
+  } catch (err) { next(err); }
 });
 
-router.post('/clients/:id/delete', (req, res) => {
-  clientsRepo.remove(req.params.id);
-  res.redirect('/admin?deleted=1');
+router.post('/clients/:id/delete', async (req, res, next) => {
+  try {
+    await clientsRepo.remove(req.params.id);
+    res.redirect('/admin?deleted=1');
+  } catch (err) { next(err); }
 });
 
-router.post('/clients/:id/test', async (req, res) => {
-  const client = clientsRepo.findById(req.params.id);
-  if (!client) return res.status(404).send('Client not found');
-  const target = (req.body.to || client.agent_email || '').trim();
-  if (!target) return res.redirect(`/admin/clients/${client.id}?tested=fail&reason=${encodeURIComponent('No target email')}`);
+router.post('/clients/:id/test', async (req, res, next) => {
+  try {
+    const client = await clientsRepo.findById(req.params.id);
+    if (!client) return res.status(404).send('Client not found');
+    const target = (req.body.to || client.agent_email || '').trim();
+    if (!target) return res.redirect(`/admin/clients/${client.id}?tested=fail&reason=${encodeURIComponent('No target email')}`);
 
-  const samplePayload = {
-    name: 'Test Lead',
-    email: target,
-    phone: '555-555-0123',
-    property_address: '123 Sample Drive, Beverly Hills, CA',
-    property_url: 'https://example.com/listing/123',
-    message: 'This is a test from the DMR Media bridge.',
-    source: 'DMR Test',
-  };
-  const result = await dispatcher.processLead({ client, rawPayload: samplePayload });
-  if (result.ok) {
-    return res.redirect(`/admin/clients/${client.id}?tested=ok`);
-  }
-  return res.redirect(`/admin/clients/${client.id}?tested=fail&reason=${encodeURIComponent(result.reason || 'unknown')}`);
+    const samplePayload = {
+      name: 'Test Lead',
+      email: target,
+      phone: '555-555-0123',
+      property_address: '123 Sample Drive, Beverly Hills, CA',
+      property_url: 'https://example.com/listing/123',
+      message: 'This is a test from the DMR Media bridge.',
+      source: 'DMR Test',
+    };
+    const result = await dispatcher.processLead({ client, rawPayload: samplePayload });
+    if (result.ok) {
+      return res.redirect(`/admin/clients/${client.id}?tested=ok`);
+    }
+    return res.redirect(`/admin/clients/${client.id}?tested=fail&reason=${encodeURIComponent(result.reason || 'unknown')}`);
+  } catch (err) { next(err); }
 });
 
-router.get('/leads', (req, res) => {
-  const recent = leadsRepo.recent(100);
-  res.render('leads', {
-    page: 'leads',
-    leads: recent,
-    flash: null,
-    publicBaseUrl: config.publicBaseUrl,
-  });
+router.get('/leads', async (req, res, next) => {
+  try {
+    const recent = await leadsRepo.recent(100);
+    res.render('leads', {
+      page: 'leads',
+      leads: recent,
+      flash: null,
+      publicBaseUrl: config.publicBaseUrl,
+    });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

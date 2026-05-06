@@ -2,34 +2,42 @@
 
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 const config = require('./config');
 
-let db = null;
+let pool = null;
 
-function getDb() {
-  if (db) return db;
-  const dir = path.dirname(config.database.path);
-  fs.mkdirSync(dir, { recursive: true });
-  db = new Database(config.database.path);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  return db;
+function getPool() {
+  if (pool) return pool;
+  if (!config.database.url) {
+    throw new Error('DATABASE_URL is required');
+  }
+  pool = new Pool({
+    connectionString: config.database.url,
+    ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+    max: config.database.max,
+  });
+  pool.on('error', (err) => {
+    console.error('[db] idle client error:', err);
+  });
+  return pool;
 }
 
-function initDb() {
-  const conn = getDb();
+async function query(text, params) {
+  return getPool().query(text, params);
+}
+
+async function initDb() {
   const schemaPath = path.resolve(__dirname, '..', 'schema.sql');
   const sql = fs.readFileSync(schemaPath, 'utf8');
-  conn.exec(sql);
-  return conn;
+  await getPool().query(sql);
 }
 
-function close() {
-  if (db) {
-    db.close();
-    db = null;
+async function close() {
+  if (pool) {
+    await pool.end();
+    pool = null;
   }
 }
 
-module.exports = { getDb, initDb, close };
+module.exports = { getPool, query, initDb, close };

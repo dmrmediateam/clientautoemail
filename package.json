@@ -11,16 +11,16 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "migrate": "node scripts/migrate.js",
-    "seed": "node scripts/seed.js"
+    "migrate:v2": "node scripts/migrate-v2.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.5.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
     "googleapis": "^144.0.0",
-    "helmet": "^8.0.0"
+    "helmet": "^8.0.0",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

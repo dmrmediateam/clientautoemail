@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["views/**", "public/**", "schema.sql", "schema-v2.sql", "src/**"] }
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/send-queued",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/api/index.js" }
+  ]
+}

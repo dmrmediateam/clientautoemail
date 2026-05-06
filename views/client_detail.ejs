@@ -1,12 +1,12 @@
 <%
   const title = client.name;
   const webhookUrl = publicBaseUrl + '/v1/webhooks/incoming/' + client.id;
-  function statusBadge(s) {
+  const statusBadge = (s) => {
     if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
     if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
     if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
     return '<span class="badge badge-off">' + s + '</span>';
-  }
+  };
 %>
 <%- include('_header', { brand, page, flash, title }) %>
 
@@ -23,13 +23,6 @@
   </div>
   <div class="actions">
     <a class="btn" href="/admin/clients/<%= client.id %>/edit">Edit</a>
-    <% if (client.google.connected) { %>
-      <form action="/auth/google/disconnect/<%= client.id %>" method="post" style="display:inline">
-        <button class="btn" type="submit">Disconnect Gmail</button>
-      </form>
-    <% } else { %>
-      <a class="btn btn-primary" href="/auth/google/start/<%= client.id %>">Connect Gmail</a>
-    <% } %>
   </div>
 </div>
 
@@ -72,7 +65,7 @@
     <p class="help">A sample lead is generated and sent through the same pipeline a real webhook uses.</p>
     <div class="actions" style="margin-top:14px">
       <button type="submit" class="btn btn-primary" <%= !client.google.connected ? 'disabled' : '' %>>Send test email</button>
-      <% if (!client.google.connected) { %><span class="help">Connect Gmail first.</span><% } %>
+      <% if (!client.google.connected) { %><span class="help">Client must sign in via /onboarding first.</span><% } %>
     </div>
   </form>
 </div>

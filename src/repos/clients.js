@@ -1,13 +1,17 @@
 'use strict';
 
 const crypto = require('crypto');
-const { getDb } = require('../db');
+const { query } = require('../db');
 const enc = require('../crypto');
+const clientSettingsRepo = require('./clientSettings');
 
 function now() { return Date.now(); }
 
-function rowToClient(row) {
+function rowToClient(row, settings) {
   if (!row) return null;
+  const effectiveSettings = settings || clientSettingsRepo.defaultSettings();
+  const buyerSubject = effectiveSettings.buyer_template_subject || row.template_subject;
+  const buyerBody = effectiveSettings.buyer_template_body || row.template_body;
   return {
     id: row.id,
     name: row.name,
@@ -17,63 +21,105 @@ function rowToClient(row) {
     agent_phone: row.agent_phone || '',
     sendgrid_api_key: row.sendgrid_api_key_encrypted ? enc.decrypt(row.sendgrid_api_key_encrypted) : null,
     template: {
-      subject: row.template_subject,
-      body: row.template_body,
+      subject: buyerSubject,
+      body: buyerBody,
+    },
+    templates: {
+      buyer: {
+        subject: buyerSubject,
+        body: buyerBody,
+      },
+      seller: {
+        subject: effectiveSettings.seller_template_subject || buyerSubject,
+        body: effectiveSettings.seller_template_body || buyerBody,
+      },
+    },
+    settings: {
+      send_window_start: effectiveSettings.send_window_start,
+      send_window_end: effectiveSettings.send_window_end,
+      timezone: effectiveSettings.timezone,
+      daily_send_limit: Number(effectiveSettings.daily_send_limit || 5),
+      buyer_template_subject: buyerSubject,
+      buyer_template_body: buyerBody,
+      seller_template_subject: effectiveSettings.seller_template_subject || buyerSubject,
+      seller_template_body: effectiveSettings.seller_template_body || buyerBody,
     },
     google: {
       access_token: row.google_access_token_encrypted ? enc.decrypt(row.google_access_token_encrypted) : null,
       refresh_token: row.google_refresh_token_encrypted ? enc.decrypt(row.google_refresh_token_encrypted) : null,
-      expiry: row.google_token_expiry || 0,
+      expiry: row.google_token_expiry ? Number(row.google_token_expiry) : 0,
       scope: row.google_scope || '',
       email: row.google_email || '',
       connected: !!row.google_refresh_token_encrypted,
     },
     active: !!row.active,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    created_at: Number(row.created_at),
+    updated_at: Number(row.updated_at),
   };
 }
 
-function findById(id) {
-  const row = getDb().prepare('SELECT * FROM clients WHERE id = ?').get(id);
-  return rowToClient(row);
+async function findById(id) {
+  const r = await query('SELECT * FROM clients WHERE id = $1', [id]);
+  if (!r.rows[0]) return null;
+  const settings = await clientSettingsRepo.findByClientId(id);
+  return rowToClient(r.rows[0], settings);
 }
 
-function findAll() {
-  const rows = getDb().prepare('SELECT * FROM clients ORDER BY created_at DESC').all();
-  return rows.map(rowToClient);
+async function findByGoogleEmail(email) {
+  if (!email) return null;
+  const r = await query(
+    'SELECT * FROM clients WHERE LOWER(google_email) = LOWER($1) OR LOWER(agent_email) = LOWER($1) LIMIT 1',
+    [email]
+  );
+  if (!r.rows[0]) return null;
+  const settings = await clientSettingsRepo.findByClientId(r.rows[0].id);
+  return rowToClient(r.rows[0], settings);
 }
 
-function create(input) {
+async function findAll() {
+  const r = await query('SELECT * FROM clients ORDER BY created_at DESC');
+  const out = [];
+  for (const row of r.rows) {
+    const settings = await clientSettingsRepo.findByClientId(row.id);
+    out.push(rowToClient(row, settings));
+  }
+  return out;
+}
+
+async function create(input) {
   const id = input.id || crypto.randomUUID();
   const ts = now();
-  getDb().prepare(`
-    INSERT INTO clients (
+  await query(
+    `INSERT INTO clients (
       id, name, website, agent_name, agent_email, agent_phone,
       sendgrid_api_key_encrypted, template_subject, template_body,
       active, created_at, updated_at
-    ) VALUES (
-      @id, @name, @website, @agent_name, @agent_email, @agent_phone,
-      @sendgrid_api_key_encrypted, @template_subject, @template_body,
-      1, @ts, @ts
-    )
-  `).run({
-    id,
-    name: input.name,
-    website: input.website || null,
-    agent_name: input.agent_name,
-    agent_email: input.agent_email,
-    agent_phone: input.agent_phone || null,
-    sendgrid_api_key_encrypted: input.sendgrid_api_key ? enc.encrypt(input.sendgrid_api_key) : null,
-    template_subject: input.template_subject || 'Question about {{property_address}}',
-    template_body: input.template_body || defaultTemplateBody(),
-    ts,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, $10, $10)`,
+    [
+      id,
+      input.name,
+      input.website || null,
+      input.agent_name,
+      input.agent_email,
+      input.agent_phone || null,
+      input.sendgrid_api_key ? enc.encrypt(input.sendgrid_api_key) : null,
+      input.template_subject || 'Question about {{property_address}}',
+      input.template_body || defaultTemplateBody(),
+      ts,
+    ]
+  );
+  await clientSettingsRepo.upsert(id, {
+    buyer_template_subject: input.template_subject || 'Question about {{property_address}}',
+    buyer_template_body: input.template_body || defaultTemplateBody(),
+    seller_template_subject: input.template_subject || 'Question about your home at {{property_address}}',
+    seller_template_body: input.template_body || defaultTemplateBody(),
   });
   return findById(id);
 }
 
-function update(id, patch) {
-  const existing = getDb().prepare('SELECT * FROM clients WHERE id = ?').get(id);
+async function update(id, patch) {
+  const r = await query('SELECT * FROM clients WHERE id = $1', [id]);
+  const existing = r.rows[0];
   if (!existing) return null;
   const ts = now();
   const next = {
@@ -84,63 +130,84 @@ function update(id, patch) {
     agent_phone: patch.agent_phone ?? existing.agent_phone,
     template_subject: patch.template_subject ?? existing.template_subject,
     template_body: patch.template_body ?? existing.template_body,
-    active: patch.active != null ? (patch.active ? 1 : 0) : existing.active,
+    active: patch.active != null ? !!patch.active : !!existing.active,
     sendgrid_api_key_encrypted: patch.sendgrid_api_key !== undefined
       ? (patch.sendgrid_api_key ? enc.encrypt(patch.sendgrid_api_key) : null)
       : existing.sendgrid_api_key_encrypted,
   };
-  getDb().prepare(`
-    UPDATE clients SET
-      name = @name, website = @website,
-      agent_name = @agent_name, agent_email = @agent_email, agent_phone = @agent_phone,
-      template_subject = @template_subject, template_body = @template_body,
-      sendgrid_api_key_encrypted = @sendgrid_api_key_encrypted,
-      active = @active, updated_at = @ts
-    WHERE id = @id
-  `).run({ id, ts, ...next });
-  return findById(id);
-}
-
-function saveGoogleTokens(id, tokens) {
-  const ts = now();
-  getDb().prepare(`
-    UPDATE clients SET
-      google_access_token_encrypted = @access,
-      google_refresh_token_encrypted = COALESCE(@refresh, google_refresh_token_encrypted),
-      google_token_expiry = @expiry,
-      google_scope = @scope,
-      google_email = COALESCE(@email, google_email),
-      updated_at = @ts
-    WHERE id = @id
-  `).run({
-    id,
-    access: tokens.access_token ? enc.encrypt(tokens.access_token) : null,
-    refresh: tokens.refresh_token ? enc.encrypt(tokens.refresh_token) : null,
-    expiry: tokens.expiry || null,
-    scope: tokens.scope || null,
-    email: tokens.email || null,
-    ts,
+  await query(
+    `UPDATE clients SET
+      name = $2, website = $3,
+      agent_name = $4, agent_email = $5, agent_phone = $6,
+      template_subject = $7, template_body = $8,
+      sendgrid_api_key_encrypted = $9,
+      active = $10, updated_at = $11
+    WHERE id = $1`,
+    [
+      id,
+      next.name, next.website,
+      next.agent_name, next.agent_email, next.agent_phone,
+      next.template_subject, next.template_body,
+      next.sendgrid_api_key_encrypted,
+      next.active, ts,
+    ]
+  );
+  await clientSettingsRepo.upsert(id, {
+    buyer_template_subject: next.template_subject,
+    buyer_template_body: next.template_body,
+    seller_template_subject: patch.seller_template_subject ?? undefined,
+    seller_template_body: patch.seller_template_body ?? undefined,
+    send_window_start: patch.send_window_start ?? undefined,
+    send_window_end: patch.send_window_end ?? undefined,
+    timezone: patch.timezone ?? undefined,
+    daily_send_limit: patch.daily_send_limit ?? undefined,
   });
   return findById(id);
 }
 
-function clearGoogleTokens(id) {
+async function saveGoogleTokens(id, tokens) {
   const ts = now();
-  getDb().prepare(`
-    UPDATE clients SET
+  await query(
+    `UPDATE clients SET
+      google_access_token_encrypted = $2,
+      google_refresh_token_encrypted = COALESCE($3, google_refresh_token_encrypted),
+      google_token_expiry = $4,
+      google_scope = $5,
+      google_email = COALESCE($6, google_email),
+      updated_at = $7
+    WHERE id = $1`,
+    [
+      id,
+      tokens.access_token ? enc.encrypt(tokens.access_token) : null,
+      tokens.refresh_token ? enc.encrypt(tokens.refresh_token) : null,
+      tokens.expiry || null,
+      tokens.scope || null,
+      tokens.email || null,
+      ts,
+    ]
+  );
+  return findById(id);
+}
+
+async function clearGoogleTokens(id) {
+  const ts = now();
+  await query(
+    `UPDATE clients SET
       google_access_token_encrypted = NULL,
       google_refresh_token_encrypted = NULL,
       google_token_expiry = NULL,
       google_scope = NULL,
       google_email = NULL,
-      updated_at = ?
-    WHERE id = ?
-  `).run(ts, id);
+      updated_at = $2
+    WHERE id = $1`,
+    [id, ts]
+  );
   return findById(id);
 }
 
-function remove(id) {
-  return getDb().prepare('DELETE FROM clients WHERE id = ?').run(id).changes > 0;
+async function remove(id) {
+  const r = await query('DELETE FROM clients WHERE id = $1', [id]);
+  return r.rowCount > 0;
 }
 
 function defaultTemplateBody() {
@@ -158,6 +225,7 @@ function defaultTemplateBody() {
 
 module.exports = {
   findById,
+  findByGoogleEmail,
   findAll,
   create,
   update,
@@ -165,4 +233,5 @@ module.exports = {
   clearGoogleTokens,
   remove,
   defaultTemplateBody,
+  upsertSettings: clientSettingsRepo.upsert,
 };

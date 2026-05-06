@@ -1,0 +1,81 @@
+<%
+  const title = 'Conversation';
+  const page = 'dashboard';
+  const bubbleClass = (dir) => dir === 'outbound' ? 'badge-on' : 'badge-off';
+%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title><%= title %> — <%= brand.name %> · <%= brand.tagline %></title>
+<link rel="stylesheet" href="/static/css/dmr.css" />
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">DMR</div>
+      <div class="brand-text">
+        <span class="name"><%= brand.name %></span>
+        <span class="tagline"><%= brand.tagline %></span>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>">Dashboard</a>
+      <a href="/dashboard/template">Template</a>
+      <span style="color:var(--fg-muted);font-size:12px;margin:0 6px"><%= client.google.email || client.agent_email %></span>
+      <form action="/auth/logout" method="post" style="display:inline">
+        <button class="btn btn-ghost" type="submit">Sign out</button>
+      </form>
+    </nav>
+  </header>
+  <main class="main">
+  <% if (typeof flash !== 'undefined' && flash) { %>
+    <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
+  <% } %>
+
+  <h1><%= conversation.lead_name || conversation.lead_email %></h1>
+  <p class="lede"><span class="mono"><%= conversation.lead_email %></span> · <span class="badge"><%= conversation.lead_type || 'buyer' %></span></p>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Thread</h2>
+    <% if (!messages.length) { %>
+      <div class="empty">No messages yet.</div>
+    <% } else { %>
+      <% messages.forEach((m) => { %>
+        <div style="padding:12px;border:1px solid rgba(148,163,184,0.18);border-radius:12px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;gap:8px">
+            <strong><%= m.subject || 'No subject' %></strong>
+            <span class="badge <%= bubbleClass(m.direction) %>"><%= m.direction %> · <%= m.status %></span>
+          </div>
+          <div style="color:var(--fg-muted);font-size:12px;margin-top:4px" class="mono">
+            <%= m.from_email %> → <%= m.to_email %> · <%= new Date(m.created_at).toLocaleString() %>
+          </div>
+          <pre class="code-block" style="margin-top:10px;white-space:pre-wrap"><%= m.body %></pre>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Send reply</h2>
+    <form action="/dashboard/conversations/<%= conversation.id %>/reply" method="post">
+      <label>Subject</label>
+      <input class="input" name="subject" value="<%= messages.length ? ('Re: ' + (messages[messages.length - 1].subject || 'Your inquiry')) : 'Re: Your inquiry' %>" />
+      <label>Body</label>
+      <textarea class="textarea" name="body" rows="8" placeholder="Type your reply..." required></textarea>
+      <div class="actions" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary">Send now</button>
+        <a class="btn" href="/dashboard">Back</a>
+      </div>
+    </form>
+  </div>
+  </main>
+  <footer class="foot">
+    <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
+    <span class="mono"><%= brand.domain %></span>
+  </footer>
+</div>
+</body>
+</html>

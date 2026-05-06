@@ -15,6 +15,20 @@ function splitName(full) {
   return { first: parts[0], last: parts.slice(1).join(' ') };
 }
 
+function normalizeLeadType(payload) {
+  const raw = pick(payload, [
+    'lead_type',
+    'leadType',
+    'inquiry_type',
+    'inquiryType',
+    'type',
+    'contact_type',
+  ]).toLowerCase();
+  if (!raw) return 'buyer';
+  if (raw.includes('seller') || raw.includes('listing') || raw.includes('sell')) return 'seller';
+  return 'buyer';
+}
+
 function normalize(payload) {
   const p = payload || {};
 
@@ -34,6 +48,7 @@ function normalize(payload) {
     property_url: pick(p, ['property_url', 'listing_url', 'url', 'property_link']),
     property_price: pick(p, ['property_price', 'price', 'listing_price']),
     message: pick(p, ['message', 'notes', 'inquiry', 'comments', 'body']),
+    lead_type: normalizeLeadType(p),
     source: pick(p, ['source', 'lead_source']) || 'Luxury Presence',
     received_at: new Date().toISOString(),
   };

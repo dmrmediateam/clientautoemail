@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title><%= typeof title !== 'undefined' && title ? title + ' — ' : '' %><%= brand.name %> · <%= brand.tagline %></title>
+<link rel="stylesheet" href="/static/css/dmr.css" />
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">DMR</div>
+      <div class="brand-text">
+        <span class="name"><%= brand.name %></span>
+        <span class="tagline"><%= brand.tagline %></span>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>">Dashboard</a>
+      <a href="/dashboard/template" class="<%= page === 'template' ? 'active' : '' %>">Template</a>
+      <span style="color:var(--fg-muted);font-size:12px;margin:0 6px"><%= client.google.email || client.agent_email %></span>
+      <form action="/auth/logout" method="post" style="display:inline">
+        <button class="btn btn-ghost" type="submit">Sign out</button>
+      </form>
+    </nav>
+  </header>
+  <main class="main">
+  <% if (typeof flash !== 'undefined' && flash) { %>
+    <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
+  <% } %>

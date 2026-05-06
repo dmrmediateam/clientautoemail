@@ -1,0 +1,81 @@
+'use strict';
+
+const { query } = require('../db');
+
+function now() { return Date.now(); }
+
+function defaultSettings() {
+  return {
+    send_window_start: '08:30',
+    send_window_end: '18:00',
+    timezone: 'America/Chicago',
+    daily_send_limit: 5,
+    buyer_template_subject: 'Question about {{property_address}}',
+    buyer_template_body: '',
+    seller_template_subject: 'Question about your home at {{property_address}}',
+    seller_template_body: '',
+  };
+}
+
+function rowOut(row) {
+  if (!row) return null;
+  return {
+    send_window_start: row.send_window_start,
+    send_window_end: row.send_window_end,
+    timezone: row.timezone,
+    daily_send_limit: Number(row.daily_send_limit || 5),
+    buyer_template_subject: row.buyer_template_subject,
+    buyer_template_body: row.buyer_template_body,
+    seller_template_subject: row.seller_template_subject,
+    seller_template_body: row.seller_template_body,
+    created_at: Number(row.created_at || 0),
+    updated_at: Number(row.updated_at || 0),
+  };
+}
+
+async function findByClientId(clientId) {
+  const r = await query('SELECT * FROM client_settings WHERE client_id = $1', [clientId]);
+  return rowOut(r.rows[0]);
+}
+
+async function upsert(clientId, patch = {}) {
+  const ts = now();
+  const existing = await findByClientId(clientId);
+  const base = existing || defaultSettings();
+  const next = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) next[k] = v;
+  }
+  await query(
+    `INSERT INTO client_settings (
+      client_id, send_window_start, send_window_end, timezone, daily_send_limit,
+      buyer_template_subject, buyer_template_body, seller_template_subject, seller_template_body,
+      created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+    ON CONFLICT (client_id) DO UPDATE SET
+      send_window_start = EXCLUDED.send_window_start,
+      send_window_end = EXCLUDED.send_window_end,
+      timezone = EXCLUDED.timezone,
+      daily_send_limit = EXCLUDED.daily_send_limit,
+      buyer_template_subject = EXCLUDED.buyer_template_subject,
+      buyer_template_body = EXCLUDED.buyer_template_body,
+      seller_template_subject = EXCLUDED.seller_template_subject,
+      seller_template_body = EXCLUDED.seller_template_body,
+      updated_at = EXCLUDED.updated_at`,
+    [
+      clientId,
+      next.send_window_start,
+      next.send_window_end,
+      next.timezone,
+      next.daily_send_limit,
+      next.buyer_template_subject,
+      next.buyer_template_body,
+      next.seller_template_subject,
+      next.seller_template_body,
+      ts,
+    ]
+  );
+  return findByClientId(clientId);
+}
+
+module.exports = { defaultSettings, findByClientId, upsert };

@@ -1,12 +1,14 @@
 'use strict';
 
-const leadsRepo = require('../repos/leads');
+const conversationsRepo = require('../repos/conversations');
+const messagesRepo = require('../repos/messages');
 const tpl = require('./template');
-const google = require('./google');
 const { normalize } = require('./leadNormalizer');
+const { nextWindowStart } = require('./scheduler');
 
 async function processLead({ client, rawPayload }) {
   const lead = normalize(rawPayload);
+  const settings = client.settings || {};
 
   const data = {
     ...lead,
@@ -17,71 +19,118 @@ async function processLead({ client, rawPayload }) {
     client_website: client.website,
   };
 
-  const subject = tpl.render(client.template.subject, data);
-  const body = tpl.render(client.template.body, data);
+  const template = lead.lead_type === 'seller'
+    ? client.templates?.seller || client.template
+    : client.templates?.buyer || client.template;
+  const subject = tpl.render(template.subject, data);
+  const body = tpl.render(template.body, data);
+  const fromEmail = client.google.email || client.agent_email;
+
+  const conversation = await conversationsRepo.findOrCreateForLead({
+    client_id: client.id,
+    lead_email: lead.email || `unknown+${Date.now()}@unknown.invalid`,
+    lead_name: lead.full_name,
+    lead_phone: lead.phone,
+    lead_type: lead.lead_type,
+    property_address: lead.property_address,
+    source: lead.source,
+  });
 
   if (!lead.email) {
-    leadsRepo.record({
+    await messagesRepo.create({
+      conversation_id: conversation.id,
       client_id: client.id,
-      raw_payload: rawPayload,
-      normalized_payload: lead,
-      email_to: '',
-      email_from: client.google.email || client.agent_email,
+      direction: 'outbound',
+      from_email: fromEmail,
+      to_email: '',
       subject,
       body,
       status: 'failed',
       error: 'No lead email in payload',
+      raw_payload: rawPayload,
     });
     return { ok: false, reason: 'no_lead_email' };
   }
 
   if (!client.google.connected) {
-    leadsRepo.record({
+    await messagesRepo.create({
+      conversation_id: conversation.id,
       client_id: client.id,
-      raw_payload: rawPayload,
-      normalized_payload: lead,
-      email_to: lead.email,
-      email_from: client.agent_email,
+      direction: 'outbound',
+      from_email: fromEmail,
+      to_email: lead.email,
       subject,
       body,
       status: 'failed',
       error: 'Client has not connected Gmail',
+      raw_payload: rawPayload,
     });
     return { ok: false, reason: 'gmail_not_connected' };
   }
 
-  try {
-    const result = await google.sendAsClient(client, {
-      to: { email: lead.email, name: lead.full_name },
-      subject,
-      body,
-    });
-    leadsRepo.record({
-      client_id: client.id,
-      raw_payload: rawPayload,
-      normalized_payload: lead,
-      email_to: lead.email,
-      email_from: client.google.email || client.agent_email,
-      subject,
-      body,
-      status: 'sent',
-      message_id: result.messageId,
-    });
-    return { ok: true, messageId: result.messageId, threadId: result.threadId };
-  } catch (err) {
-    leadsRepo.record({
-      client_id: client.id,
-      raw_payload: rawPayload,
-      normalized_payload: lead,
-      email_to: lead.email,
-      email_from: client.google.email || client.agent_email,
-      subject,
-      body,
-      status: 'failed',
-      error: err.code ? `${err.code}: ${err.message}` : (err.message || String(err)),
-    });
-    return { ok: false, reason: err.code || 'gmail_send_error', error: err.message };
+  const sendWindow = {
+    sendWindowStart: settings.send_window_start || '08:30',
+    sendWindowEnd: settings.send_window_end || '18:00',
+    timezone: settings.timezone || 'America/Chicago',
+  };
+  const sentToday = await messagesRepo.countSentForClientToday(client.id, sendWindow.timezone);
+  const dailyLimit = Number(settings.daily_send_limit || 5);
+  const overLimit = sentToday >= dailyLimit;
+  const scheduledFor = nextWindowStart({
+    nowMs: Date.now(),
+    ...sendWindow,
+    forceNextDay: overLimit,
+  });
+
+  const status = overLimit ? 'rate_limited' : 'queued';
+  const message = await messagesRepo.create({
+    conversation_id: conversation.id,
+    client_id: client.id,
+    direction: 'outbound',
+    from_email: fromEmail,
+    to_email: lead.email,
+    subject,
+    body,
+    status,
+    scheduled_for: scheduledFor,
+    raw_payload: rawPayload,
+  });
+
+  if (overLimit) {
+    return {
+      ok: false,
+      accepted: true,
+      queued: false,
+      reason: 'daily_limit_reached',
+      messageId: message.id,
+      scheduledFor,
+    };
   }
+
+  return {
+    ok: true,
+    accepted: true,
+    queued: true,
+    messageId: message.id,
+    conversationId: conversation.id,
+    scheduledFor,
+    leadType: lead.lead_type,
+  };
 }
 
-module.exports = { processLead };
+async function queueReply({ client, conversation, body }) {
+  const subject = conversation.last_subject || `Re: ${conversation.property_address || 'Your inquiry'}`;
+  return messagesRepo.create({
+    conversation_id: conversation.id,
+    client_id: client.id,
+    direction: 'outbound',
+    from_email: client.google.email || client.agent_email,
+    to_email: conversation.lead_email,
+    subject,
+    body,
+    status: 'queued',
+    scheduled_for: Date.now(),
+  });
+}
+
+module.exports = { processLead, queueReply };

@@ -2,8 +2,6 @@
 
 require('dotenv').config();
 
-const path = require('path');
-
 function required(name) {
   const v = process.env[name];
   if (!v || !v.trim()) {
@@ -42,7 +40,7 @@ const config = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET', ''),
     scopes: optional(
       'GOOGLE_OAUTH_SCOPES',
-      'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile'
+      'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile'
     ).split(/\s+/).filter(Boolean),
     get redirectUri() {
       return `${config.publicBaseUrl}/auth/google/callback`;
@@ -50,7 +48,18 @@ const config = {
   },
 
   database: {
-    path: path.resolve(process.cwd(), optional('DATABASE_PATH', './data/bridge.db')),
+    url: optional('DATABASE_URL', '') || optional('POSTGRES_URL', ''),
+    ssl: optional('DATABASE_SSL', 'auto') !== 'false',
+    max: parseInt(optional('DATABASE_POOL_MAX', '3'), 10),
+  },
+
+  cron: {
+    secret: optional('CRON_SECRET', ''),
+  },
+
+  gmailPush: {
+    topic: optional('GMAIL_PUBSUB_TOPIC', ''),
+    verificationToken: optional('GMAIL_PUSH_VERIFICATION_TOKEN', ''),
   },
 };
 
@@ -64,6 +73,7 @@ function assertProductionConfig() {
   }
   if (!config.google.clientId) missing.push('GOOGLE_CLIENT_ID');
   if (!config.google.clientSecret) missing.push('GOOGLE_CLIENT_SECRET');
+  if (!config.database.url) missing.push('DATABASE_URL');
   return missing;
 }
 
