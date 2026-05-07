@@ -25,16 +25,16 @@ function flashFromQuery(req) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const [conversations, sentToday] = await Promise.all([
+    const [conversations, recentMessages] = await Promise.all([
       conversationsRepo.listWithPreview(req.client.id, 50),
-      messagesRepo.countSentForClientToday(req.client.id, req.client.settings?.timezone),
+      messagesRepo.listRecentByClient(req.client.id, 100),
     ]);
     res.render('client_dashboard', {
       brand: config.brand,
       publicBaseUrl: config.publicBaseUrl,
       client: req.client,
       conversations,
-      sentToday,
+      recentMessages,
       nextSendAt: nextWindowStart({
         nowMs: Date.now(),
         sendWindowStart: req.client.settings?.send_window_start,

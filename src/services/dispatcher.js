@@ -73,16 +73,12 @@ async function processLead({ client, rawPayload }) {
     sendWindowEnd: settings.send_window_end || '18:00',
     timezone: settings.timezone || 'America/Chicago',
   };
-  const sentToday = await messagesRepo.countSentForClientToday(client.id, sendWindow.timezone);
-  const dailyLimit = Number(settings.daily_send_limit || 5);
-  const overLimit = sentToday >= dailyLimit;
   const scheduledFor = nextWindowStart({
     nowMs: Date.now(),
     ...sendWindow,
-    forceNextDay: overLimit,
+    forceNextDay: false,
   });
 
-  const status = overLimit ? 'rate_limited' : 'queued';
   const ccEmail = client.settings?.cc_email || '';
   const message = await messagesRepo.create({
     conversation_id: conversation.id,
@@ -92,21 +88,10 @@ async function processLead({ client, rawPayload }) {
     to_email: lead.email,
     subject,
     body,
-    status,
+    status: 'queued',
     scheduled_for: scheduledFor,
     raw_payload: rawPayload,
   });
-
-  if (overLimit) {
-    return {
-      ok: false,
-      accepted: true,
-      queued: false,
-      reason: 'daily_limit_reached',
-      messageId: message.id,
-      scheduledFor,
-    };
-  }
 
   return {
     ok: true,

@@ -8,6 +8,8 @@
     month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit',
   });
+  const sentMessages = recentMessages.filter(m => m.direction === 'outbound');
+  const sentCount = sentMessages.filter(m => m.status === 'sent').length;
 %>
 <!doctype html>
 <html lang="en">
@@ -25,11 +27,13 @@
   }
   .status-hero .left h1 { margin: 0 0 6px; font-size: 22px; }
   .status-hero .sub { color: var(--fg-muted); font-size: 13px; margin-top: 6px; }
-  .live-dot {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--success); margin-right: 6px; animation: pulse 2s infinite;
-  }
+  .live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--success); margin-right:6px; animation:pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .stats { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:20px; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
+  .stat .s-label { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--fg-muted); }
+  .stat .s-value { font-size:26px; font-weight:700; font-family:var(--mono); margin-top:4px; }
+  .stat .s-sub   { font-size:11px; color:var(--fg-muted); margin-top:2px; }
   .checklist { list-style:none; margin:0; padding:0; }
   .checklist li { display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
   .checklist li:last-child { border-bottom:0; }
@@ -38,19 +42,33 @@
   .check-todo { background:var(--surface-2); color:var(--fg-muted); border:1px solid var(--border); }
   .check-label strong { display:block; font-size:14px; margin-bottom:2px; }
   .check-label span   { font-size:12px; color:var(--fg-muted); }
-  .stats { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:20px; }
-  .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
-  .stat .s-label { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--fg-muted); }
-  .stat .s-value { font-size:26px; font-weight:700; font-family:var(--mono); margin-top:4px; }
-  .stat .s-sub   { font-size:11px; color:var(--fg-muted); margin-top:2px; }
-  .conv-feed { list-style:none; margin:0; padding:0; }
-  .conv-item { display:grid; grid-template-columns:1fr auto; gap:8px 16px; padding:14px 0; border-bottom:1px solid var(--border); align-items:start; }
-  .conv-item:last-child { border-bottom:0; }
-  .conv-lead { font-weight:600; font-size:14px; }
-  .conv-email { font-size:12px; color:var(--fg-muted); font-family:var(--mono); }
-  .conv-subject { font-size:13px; color:var(--fg-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; }
-  .conv-meta { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
-  .conv-time { font-size:11px; color:var(--fg-muted); font-family:var(--mono); white-space:nowrap; }
+  /* Activity feed */
+  .activity { list-style:none; margin:0; padding:0; }
+  .activity-item {
+    display:grid; grid-template-columns:1fr auto;
+    gap:4px 16px; padding:16px 0; border-bottom:1px solid var(--border); align-items:start;
+  }
+  .activity-item:last-child { border-bottom:0; }
+  .act-lead { font-weight:600; font-size:14px; }
+  .act-email { font-size:12px; color:var(--fg-muted); font-family:var(--mono); margin-top:1px; }
+  .act-prop  { font-size:12px; color:var(--fg-muted); margin-top:3px; }
+  .act-reply { font-size:12px; margin-top:6px; padding:8px 10px; background:var(--surface-2); border-radius:6px; border-left:3px solid var(--border); }
+  .act-reply .reply-label { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--fg-muted); margin-bottom:3px; }
+  .act-reply .reply-subject { font-size:13px; font-weight:500; }
+  .act-reply .reply-status  { margin-top:4px; }
+  .act-meta { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .act-time { font-size:11px; color:var(--fg-muted); font-family:var(--mono); white-space:nowrap; }
+  /* Messages tab */
+  .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin:-20px -20px 20px; padding:0 20px; }
+  .tab-bar button { background:none; border:none; padding:12px 16px; font-size:13px; color:var(--fg-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab-bar button.active { color:var(--fg); border-bottom-color:var(--accent); }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  .msg-row { display:grid; grid-template-columns:1fr auto auto; gap:8px 16px; padding:12px 0; border-bottom:1px solid var(--border); align-items:center; }
+  .msg-row:last-child { border-bottom:0; }
+  .msg-to   { font-size:13px; font-weight:500; }
+  .msg-sub  { font-size:12px; color:var(--fg-muted); margin-top:2px; }
+  .msg-time { font-size:11px; color:var(--fg-muted); font-family:var(--mono); white-space:nowrap; text-align:right; }
 </style>
 </head>
 <body>
@@ -116,14 +134,14 @@
 
     <div class="stats">
       <div class="stat">
-        <div class="s-label">Conversations</div>
+        <div class="s-label">Leads received</div>
         <div class="s-value"><%= conversations.length %></div>
         <div class="s-sub">all time</div>
       </div>
       <div class="stat">
-        <div class="s-label">Sent today</div>
-        <div class="s-value"><%= sentToday %><span style="color:var(--fg-muted);font-size:14px;font-weight:400"> / <%= client.settings?.daily_send_limit || 5 %></span></div>
-        <div class="s-sub">daily cap</div>
+        <div class="s-label">Emails sent</div>
+        <div class="s-value"><%= sentCount %></div>
+        <div class="s-sub">all time</div>
       </div>
       <div class="stat">
         <div class="s-label">Next send window</div>
@@ -177,6 +195,75 @@
     <% } %>
 
     <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Lead activity</h2>
+      <% if (conversations.length === 0) { %>
+        <div class="empty">No leads yet — once webhooks arrive they will appear here.</div>
+      <% } else { %>
+        <div class="tab-bar">
+          <button class="active" onclick="switchTab(this,'tab-leads')">Leads in (<%= conversations.length %>)</button>
+          <button onclick="switchTab(this,'tab-messages')">Emails out (<%= sentCount %>)</button>
+        </div>
+
+        <div id="tab-leads" class="tab-content active">
+          <ul class="activity">
+            <% conversations.forEach(c => {
+              const sm = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn' };
+              const sc = sm[c.last_status] || 'badge-off';
+              const dateStr = new Date(c.last_message_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+              const timeStr = new Date(c.last_message_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+            %>
+            <li class="activity-item">
+              <div>
+                <div class="act-lead"><%= c.lead_name || c.lead_email %></div>
+                <% if (c.lead_name) { %><div class="act-email"><%= c.lead_email %></div><% } %>
+                <% if (c.property_address) { %><div class="act-prop">🏠 <%= c.property_address %></div><% } %>
+                <% if (c.last_subject) { %>
+                <div class="act-reply">
+                  <div class="reply-label">Reply sent</div>
+                  <div class="reply-subject"><%= c.last_subject %></div>
+                  <div class="reply-status">
+                    <span class="badge <%= sc %>"><%= c.last_status || 'queued' %></span>
+                  </div>
+                </div>
+                <% } %>
+              </div>
+              <div class="act-meta">
+                <span class="badge <%= c.lead_type === 'seller' ? 'badge-warn' : 'badge-off' %>"><%= c.lead_type || 'buyer' %></span>
+                <div class="act-time"><%= dateStr %></div>
+                <div class="act-time"><%= timeStr %></div>
+                <a class="btn" style="padding:5px 10px;font-size:12px" href="/dashboard/conversations/<%= c.id %>">View →</a>
+              </div>
+            </li>
+            <% }) %>
+          </ul>
+        </div>
+
+        <div id="tab-messages" class="tab-content">
+          <% if (sentMessages.length === 0) { %>
+            <div class="empty">No emails sent yet.</div>
+          <% } else { %>
+            <% sentMessages.forEach(m => {
+              const sm2 = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn' };
+              const sc2 = sm2[m.status] || 'badge-off';
+              const ts2 = m.sent_at || m.created_at;
+              const d2 = new Date(ts2).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+              const t2 = new Date(ts2).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+            %>
+            <div class="msg-row">
+              <div>
+                <div class="msg-to">To: <%= m.to_email %></div>
+                <div class="msg-sub"><%= m.subject %></div>
+              </div>
+              <span class="badge <%= sc2 %>"><%= m.status %></span>
+              <div class="msg-time"><%= d2 %><br><%= t2 %></div>
+            </div>
+            <% }) %>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
       <h2 style="margin-top:0">Webhook URL</h2>
       <p class="lede" style="margin-bottom:14px">Paste into Luxury Presence as your POST lead destination.</p>
       <div style="display:flex;gap:8px;align-items:stretch">
@@ -195,35 +282,6 @@
         </div>
         <p class="help">Fires a sample lead through the full pipeline. Check your Gmail Sent folder to confirm delivery.</p>
       </form>
-    </div>
-
-    <div class="panel" style="margin-bottom:20px">
-      <h2 style="margin-top:0">Recent conversations</h2>
-      <% if (conversations.length === 0) { %>
-        <div class="empty">No leads yet — once webhooks arrive they will appear here.</div>
-      <% } else { %>
-        <ul class="conv-feed">
-          <% conversations.forEach(c => { %>
-            <li class="conv-item">
-              <div>
-                <div class="conv-lead"><%= c.lead_name || c.lead_email %></div>
-                <% if (c.lead_name) { %><div class="conv-email"><%= c.lead_email %></div><% } %>
-                <div class="conv-subject"><%= c.last_subject || '—' %></div>
-              </div>
-              <div class="conv-meta">
-                <span class="badge <%= c.lead_type === 'seller' ? 'badge-warn' : 'badge-off' %>"><%= c.lead_type || 'buyer' %></span>
-                <%
-                  const sm = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn' };
-                  const sc = sm[c.last_status] || 'badge-off';
-                %>
-                <span class="badge <%= sc %>"><%= c.last_status || c.status %></span>
-                <div class="conv-time"><%= new Date(c.last_message_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) %></div>
-                <a class="btn" style="padding:6px 12px;font-size:12px" href="/dashboard/conversations/<%= c.id %>">View</a>
-              </div>
-            </li>
-          <% }) %>
-        </ul>
-      <% } %>
     </div>
 
     <div class="panel" style="margin-bottom:20px">
@@ -285,6 +343,13 @@ function copyHook(btn) {
     btn.style.cssText = 'background:var(--success);border-color:var(--success);color:#0a1a0f';
     setTimeout(() => { btn.textContent = orig; btn.style.cssText = ''; }, 2000);
   });
+}
+function switchTab(btn, id) {
+  const panel = btn.closest('.panel');
+  panel.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  panel.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  panel.querySelector('#' + id).classList.add('active');
 }
 </script>
 </body>
