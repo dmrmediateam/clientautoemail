@@ -27,10 +27,23 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0">Webhook URL</h2>
-  <p class="lede">Paste this into Luxury Presence as the destination for this client's leads.</p>
-  <div class="code-block"><%= webhookUrl %></div>
-  <p class="help">Method: POST · Content-Type: application/json</p>
+  <h2 style="margin-top:0">Setup</h2>
+  <div class="kv" style="margin-bottom:12px">
+    <div class="k">1. Agent login link</div>
+    <div class="v">
+      <div class="code-block"><%= publicBaseUrl %>/onboarding</div>
+      <p class="help">Send this to the agent. They click "Connect Gmail" and sign in with the account that will send emails.</p>
+    </div>
+    <div class="k">2. Webhook URL</div>
+    <div class="v">
+      <div class="code-block"><%= webhookUrl %></div>
+      <p class="help">Paste into Luxury Presence (or any lead source) as the POST destination. Method: POST · Content-Type: application/json</p>
+    </div>
+    <% if (client.settings && client.settings.cc_email) { %>
+    <div class="k">CC on every email</div>
+    <div class="v mono"><%= client.settings.cc_email %></div>
+    <% } %>
+  </div>
 </div>
 
 <div class="panel">
@@ -40,6 +53,7 @@
     <div class="k">From email</div><div class="v mono"><%= client.agent_email %></div>
     <div class="k">Phone</div><div class="v"><%= client.agent_phone || '—' %></div>
     <div class="k">Connected Gmail</div><div class="v mono"><%= client.google.email || '—' %></div>
+    <div class="k">CC email</div><div class="v mono"><%= (client.settings && client.settings.cc_email) ? client.settings.cc_email : '—' %></div>
     <div class="k">SendGrid key</div>
     <div class="v">
       <% if (client.sendgrid_api_key) { %><span class="badge badge-on">Per-client</span>
