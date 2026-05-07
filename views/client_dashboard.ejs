@@ -1,15 +1,57 @@
-<%
+﻿<%
   const title = 'Dashboard';
   const page = 'dashboard';
   const webhookUrl = publicBaseUrl + '/v1/webhooks/incoming/' + client.id;
+  const isLive = client.active && client.google.connected;
+  const nextSendLocal = new Date(nextSendAt).toLocaleString('en-US', {
+    timeZone: client.settings?.timezone || 'America/Chicago',
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
 %>
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title><%= title %> — <%= brand.name %> · <%= brand.tagline %></title>
+<title><%= title %> — <%= brand.name %></title>
 <link rel="stylesheet" href="/static/css/dmr.css" />
+<style>
+  .status-hero {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 28px 24px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .status-hero .left h1 { margin: 0 0 6px; font-size: 22px; }
+  .status-hero .sub { color: var(--fg-muted); font-size: 13px; margin-top: 6px; }
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success); margin-right: 6px; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .checklist { list-style:none; margin:0; padding:0; }
+  .checklist li { display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .checklist li:last-child { border-bottom:0; }
+  .check-icon { width:22px; height:22px; border-radius:50%; flex-shrink:0; margin-top:1px; display:grid; place-items:center; font-size:11px; }
+  .check-done { background:rgba(74,222,128,.15); color:var(--success); border:1px solid rgba(74,222,128,.3); }
+  .check-todo { background:var(--surface-2); color:var(--fg-muted); border:1px solid var(--border); }
+  .check-label strong { display:block; font-size:14px; margin-bottom:2px; }
+  .check-label span   { font-size:12px; color:var(--fg-muted); }
+  .stats { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:20px; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
+  .stat .s-label { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--fg-muted); }
+  .stat .s-value { font-size:26px; font-weight:700; font-family:var(--mono); margin-top:4px; }
+  .stat .s-sub   { font-size:11px; color:var(--fg-muted); margin-top:2px; }
+  .conv-feed { list-style:none; margin:0; padding:0; }
+  .conv-item { display:grid; grid-template-columns:1fr auto; gap:8px 16px; padding:14px 0; border-bottom:1px solid var(--border); align-items:start; }
+  .conv-item:last-child { border-bottom:0; }
+  .conv-lead { font-weight:600; font-size:14px; }
+  .conv-email { font-size:12px; color:var(--fg-muted); font-family:var(--mono); }
+  .conv-subject { font-size:13px; color:var(--fg-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; }
+  .conv-meta { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+  .conv-time { font-size:11px; color:var(--fg-muted); font-family:var(--mono); white-space:nowrap; }
+</style>
 </head>
 <body>
 <div class="shell">
@@ -22,184 +64,228 @@
       </div>
     </div>
     <nav class="nav">
-      <a href="/dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>">Dashboard</a>
-      <a href="/dashboard/template" class="<%= page === 'template' ? 'active' : '' %>">Template</a>
-      <span style="color:var(--fg-muted);font-size:12px;margin:0 6px"><%= client.google.email || client.agent_email %></span>
+      <a href="/dashboard" class="active">Dashboard</a>
+      <a href="/dashboard/template">Template</a>
+      <span style="color:var(--fg-muted);font-size:12px;padding:0 6px"><%= client.google.email || client.agent_email %></span>
       <form action="/auth/logout" method="post" style="display:inline">
         <button class="btn btn-ghost" type="submit">Sign out</button>
       </form>
     </nav>
   </header>
+
   <main class="main">
-  <% if (typeof flash !== 'undefined' && flash) { %>
-    <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
-  <% } %>
+    <% if (typeof flash !== 'undefined' && flash) { %>
+      <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
+    <% } %>
 
-<h1>Welcome, <%= client.agent_name || client.google.email %></h1>
-<p class="lede">
-  <% if (client.active && client.google.connected) { %>
-    <span class="badge badge-on">Active</span> Your bridge is live and ready to receive leads.
-  <% } else if (!client.active) { %>
-    <span class="badge badge-off">Paused</span> Webhooks are being ignored until you resume.
-  <% } else { %>
-    <span class="badge badge-warn">Disconnected</span> Reconnect Gmail to start sending.
-  <% } %>
-</p>
-
-<div class="panel">
-  <h2 style="margin-top:0">Your webhook URL</h2>
-  <p class="lede">Paste this into Luxury Presence (or any lead-gen tool) as the destination for new leads.</p>
-  <div style="display:flex;gap:8px;align-items:stretch">
-    <input id="hookUrl" class="input mono" readonly value="<%= webhookUrl %>" style="flex:1" />
-    <button class="btn btn-primary" type="button" onclick="copyHook()">Copy</button>
-  </div>
-  <p class="help">Method: POST · Content-Type: application/json. <a href="#payload">Payload format below.</a></p>
-</div>
-
-<div class="cards">
-  <div class="card">
-    <div class="label">Connected Gmail</div>
-    <div class="value mono" style="font-size:14px;word-break:break-all"><%= client.google.email || '—' %></div>
-  </div>
-  <div class="card">
-    <div class="label">Conversations</div>
-    <div class="value"><%= conversations.length %><span style="color:var(--fg-muted);font-size:13px;font-weight:400"> total</span></div>
-  </div>
-  <div class="card">
-    <div class="label">Status</div>
-    <div class="value" style="font-size:18px">
-      <% if (client.active) { %><span class="badge badge-on">Active</span><% } else { %><span class="badge badge-off">Paused</span><% } %>
-    </div>
-  </div>
-  <div class="card">
-    <div class="label">Sent Today</div>
-    <div class="value"><%= sentToday %> / <%= client.settings?.daily_send_limit || 5 %></div>
-  </div>
-</div>
-
-<div class="panel">
-  <h2 style="margin-top:0">Send a test</h2>
-  <form action="/dashboard/test" method="post">
-    <label>Send a test email to:</label>
-    <div style="display:flex;gap:8px;align-items:stretch">
-      <input class="input" type="email" name="to" value="<%= client.google.email || client.agent_email %>" style="flex:1" />
-      <button type="submit" class="btn btn-primary">Send test</button>
-    </div>
-    <p class="help">A sample lead is generated and sent through the same pipeline a real webhook uses. The email will appear in your Gmail Sent folder.</p>
-  </form>
-</div>
-
-<div class="panel">
-  <h2 style="margin-top:0">Your identity</h2>
-  <form action="/dashboard/identity" method="post">
-    <div class="row">
-      <div>
-        <label>Display name (your name as it appears in the "From")</label>
-        <input class="input" name="agent_name" value="<%= client.agent_name %>" />
+    <div class="status-hero">
+      <div class="left">
+        <h1>
+          <% if (isLive) { %><span class="live-dot"></span><% } %>
+          <%= client.agent_name || client.name %>
+        </h1>
+        <div>
+          <% if (isLive) { %>
+            <span class="badge badge-on">Live</span>
+            <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Responding via <span class="mono"><%= client.google.email %></span></span>
+          <% } else if (!client.google.connected) { %>
+            <span class="badge badge-warn">Needs Setup</span>
+            <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Connect Gmail below to go live.</span>
+          <% } else { %>
+            <span class="badge badge-off">Paused</span>
+            <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Webhooks are being ignored.</span>
+          <% } %>
+        </div>
+        <div class="sub"><%= client.name %><% if (client.website) { %> · <%= client.website %><% } %></div>
       </div>
-      <div>
-        <label>Phone (used in templates as {{agent_phone}})</label>
-        <input class="input" name="agent_phone" value="<%= client.agent_phone %>" />
+      <div class="actions">
+        <a class="btn" href="/dashboard/template">Edit template</a>
+        <% if (client.active && client.google.connected) { %>
+          <form action="/dashboard/pause" method="post" style="display:inline">
+            <button class="btn" type="submit">Pause</button>
+          </form>
+        <% } else if (client.active && !client.google.connected) { %>
+          <a class="btn btn-primary" href="/auth/google/start">Connect Gmail</a>
+        <% } else { %>
+          <form action="/dashboard/resume" method="post" style="display:inline">
+            <button class="btn btn-primary" type="submit">Resume</button>
+          </form>
+        <% } %>
       </div>
     </div>
-    <div class="row">
-      <div>
-        <label>Brokerage / business name</label>
-        <input class="input" name="name" value="<%= client.name %>" />
+
+    <div class="stats">
+      <div class="stat">
+        <div class="s-label">Conversations</div>
+        <div class="s-value"><%= conversations.length %></div>
+        <div class="s-sub">all time</div>
       </div>
-      <div>
-        <label>Website</label>
-        <input class="input" name="website" value="<%= client.website %>" />
+      <div class="stat">
+        <div class="s-label">Sent today</div>
+        <div class="s-value"><%= sentToday %><span style="color:var(--fg-muted);font-size:14px;font-weight:400"> / <%= client.settings?.daily_send_limit || 5 %></span></div>
+        <div class="s-sub">daily cap</div>
+      </div>
+      <div class="stat">
+        <div class="s-label">Next send window</div>
+        <div class="s-value" style="font-size:14px;line-height:1.4;margin-top:6px"><%= nextSendLocal %></div>
+        <div class="s-sub"><%= client.settings?.timezone || 'America/Chicago' %></div>
+      </div>
+      <div class="stat">
+        <div class="s-label">From address</div>
+        <div class="s-value" style="font-size:13px;line-height:1.4;margin-top:6px"><%= client.google.email || '—' %></div>
+        <% if (client.settings && client.settings.cc_email) { %>
+          <div class="s-sub">CC: <%= client.settings.cc_email %></div>
+        <% } %>
       </div>
     </div>
-    <div class="actions" style="margin-top:18px">
-      <button type="submit" class="btn btn-primary">Save</button>
-      <a class="btn" href="/dashboard/template">Edit template →</a>
+
+    <% if (!isLive || conversations.length === 0) { %>
+    <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Getting started</h2>
+      <ul class="checklist">
+        <li>
+          <div class="check-icon <%= client.google.connected ? 'check-done' : 'check-todo' %>">
+            <%= client.google.connected ? '✓' : '1' %>
+          </div>
+          <div class="check-label">
+            <strong>Connect Gmail</strong>
+            <% if (client.google.connected) { %>
+              <span>Connected as <%= client.google.email %></span>
+            <% } else { %>
+              <span><a href="/auth/google/start">Authorize your Google account</a> — takes 30 seconds.</span>
+            <% } %>
+          </div>
+        </li>
+        <li>
+          <div class="check-icon check-done">✓</div>
+          <div class="check-label">
+            <strong>Add webhook to Luxury Presence</strong>
+            <span>LP Dashboard → Settings → Lead Notifications → Webhook. Copy the URL below.</span>
+          </div>
+        </li>
+        <li>
+          <div class="check-icon <%= conversations.length > 0 ? 'check-done' : 'check-todo' %>">
+            <%= conversations.length > 0 ? '✓' : '3' %>
+          </div>
+          <div class="check-label">
+            <strong>Receive your first lead</strong>
+            <span>Use the test button below to verify delivery before your first real lead arrives.</span>
+          </div>
+        </li>
+      </ul>
     </div>
-  </form>
-</div>
+    <% } %>
 
-<div class="panel">
-  <h2 style="margin-top:0">Inbox conversations</h2>
-  <p class="help">Next business-window send: <%= new Date(nextSendAt).toLocaleString() %> (<%= client.settings?.timezone || 'America/Chicago' %>)</p>
-  <% if (conversations.length === 0) { %>
-    <div class="empty">No conversations yet. As webhooks arrive and replies come in, they will appear here.</div>
-  <% } else { %>
-    <table>
-      <thead><tr><th>When</th><th>Lead</th><th>Type</th><th>Last message</th><th>Status</th><th></th></tr></thead>
-      <tbody>
-        <% conversations.forEach(c => { %>
-          <tr>
-            <td class="mono" style="font-size:12px"><%= new Date(c.last_message_at).toLocaleString() %></td>
-            <td>
-              <strong><%= c.lead_name || c.lead_email %></strong>
-              <div class="mono" style="font-size:12px;color:var(--fg-muted)"><%= c.lead_email %></div>
-            </td>
-            <td><span class="badge"><%= c.lead_type || 'buyer' %></span></td>
-            <td>
-              <div><%= c.last_subject || 'No subject yet' %></div>
-              <div style="font-size:12px;color:var(--fg-muted)"><%= (c.last_body || '').slice(0, 80) %></div>
-            </td>
-            <td><span class="badge badge-off"><%= c.last_status || c.status %></span></td>
-            <td><a class="btn" href="/dashboard/conversations/<%= c.id %>">Open</a></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
-</div>
+    <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Webhook URL</h2>
+      <p class="lede" style="margin-bottom:14px">Paste into Luxury Presence as your POST lead destination.</p>
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <input id="hookUrl" class="input mono" readonly value="<%= webhookUrl %>" style="flex:1" />
+        <button class="btn btn-primary" type="button" onclick="copyHook(this)">Copy</button>
+      </div>
+      <p class="help">Method: <strong>POST</strong> · Content-Type: <strong>application/json</strong></p>
+    </div>
 
-<div class="panel" id="payload">
-  <h2 style="margin-top:0">Webhook payload format</h2>
-  <p class="lede">Send a JSON POST. Field names are flexible — both <span class="mono">first_name</span> and <span class="mono">firstName</span> work.</p>
-  <pre class="code-block">{
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "phone": "555-0101",
-  "property_address": "123 Beverly Dr, Beverly Hills, CA",
-  "property_url": "https://example.com/listing/123",
-  "message": "I'm interested"
-}</pre>
-</div>
+    <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Send a test</h2>
+      <form action="/dashboard/test" method="post">
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <input class="input" type="email" name="to" value="<%= client.google.email || client.agent_email %>" style="flex:1" placeholder="recipient@example.com" />
+          <button type="submit" class="btn btn-primary"<%= !client.google.connected ? ' disabled title="Connect Gmail first"' : '' %>>Send test</button>
+        </div>
+        <p class="help">Fires a sample lead through the full pipeline. Check your Gmail Sent folder to confirm delivery.</p>
+      </form>
+    </div>
 
-<div class="panel" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between">
-  <div>
-    <h2 style="margin:0">Pause / resume</h2>
-    <p class="help" style="margin:4px 0 0">Pausing keeps your account but stops dispatching webhooks.</p>
-  </div>
-  <% if (client.active) { %>
-    <form action="/dashboard/pause" method="post"><button class="btn" type="submit">Pause bridge</button></form>
-  <% } else { %>
-    <form action="/dashboard/resume" method="post"><button class="btn btn-primary" type="submit">Resume bridge</button></form>
-  <% } %>
-</div>
+    <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Recent conversations</h2>
+      <% if (conversations.length === 0) { %>
+        <div class="empty">No leads yet — once webhooks arrive they will appear here.</div>
+      <% } else { %>
+        <ul class="conv-feed">
+          <% conversations.forEach(c => { %>
+            <li class="conv-item">
+              <div>
+                <div class="conv-lead"><%= c.lead_name || c.lead_email %></div>
+                <% if (c.lead_name) { %><div class="conv-email"><%= c.lead_email %></div><% } %>
+                <div class="conv-subject"><%= c.last_subject || '—' %></div>
+              </div>
+              <div class="conv-meta">
+                <span class="badge <%= c.lead_type === 'seller' ? 'badge-warn' : 'badge-off' %>"><%= c.lead_type || 'buyer' %></span>
+                <%
+                  const sm = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn' };
+                  const sc = sm[c.last_status] || 'badge-off';
+                %>
+                <span class="badge <%= sc %>"><%= c.last_status || c.status %></span>
+                <div class="conv-time"><%= new Date(c.last_message_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) %></div>
+                <a class="btn" style="padding:6px 12px;font-size:12px" href="/dashboard/conversations/<%= c.id %>">View</a>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
 
-<div class="panel" style="border-color: rgba(248,113,113,.3)">
-  <h2 style="margin-top:0;color:var(--error)">Disconnect Google</h2>
-  <p class="help">Removes our access to send on your behalf. Your data stays; you can sign back in anytime.</p>
-  <form action="/auth/disconnect" method="post" onsubmit="return confirm('Disconnect Google? Webhooks will stop sending until you reconnect.');">
-    <button class="btn btn-danger" type="submit">Disconnect Google</button>
-  </form>
+    <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Your identity</h2>
+      <form action="/dashboard/identity" method="post">
+        <div class="row">
+          <div>
+            <label>Your name <span style="font-size:11px">(appears in "From")</span></label>
+            <input class="input" name="agent_name" value="<%= client.agent_name %>" />
+          </div>
+          <div>
+            <label>Phone <span style="font-size:11px">(used as <span class="mono">{{agent_phone}}</span>)</span></label>
+            <input class="input" name="agent_phone" value="<%= client.agent_phone %>" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Brokerage / business name</label>
+            <input class="input" name="name" value="<%= client.name %>" />
+          </div>
+          <div>
+            <label>Website</label>
+            <input class="input" name="website" value="<%= client.website %>" />
+          </div>
+        </div>
+        <div class="actions" style="margin-top:16px">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a class="btn" href="/dashboard/template">Edit email template →</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel" style="border-color:rgba(248,113,113,.25)">
+      <h2 style="margin-top:0;color:var(--fg-muted);font-size:13px;text-transform:uppercase;letter-spacing:.8px">Danger zone</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <strong style="font-size:14px">Disconnect Google</strong>
+          <p class="help" style="margin:2px 0 0">Removes sending access. Your leads and history stay. Reconnect anytime.</p>
+        </div>
+        <form action="/auth/disconnect" method="post" onsubmit="return confirm('Disconnect Google? Sending will stop until you reconnect.');">
+          <button class="btn btn-danger" type="submit">Disconnect</button>
+        </form>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="foot">
+    <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
+    <span class="mono" style="font-size:11px"><%= brand.domain %></span>
+  </footer>
 </div>
 
 <script>
-function copyHook(){
-  const el = document.getElementById('hookUrl');
-  el.select(); el.setSelectionRange(0, 99999);
-  navigator.clipboard.writeText(el.value).then(() => {
-    const btn = event.target;
-    const old = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = old, 1500);
+function copyHook(btn) {
+  navigator.clipboard.writeText(document.getElementById('hookUrl').value).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    btn.style.cssText = 'background:var(--success);border-color:var(--success);color:#0a1a0f';
+    setTimeout(() => { btn.textContent = orig; btn.style.cssText = ''; }, 2000);
   });
 }
 </script>
-
-  </main>
-  <footer class="foot">
-    <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
-    <span class="mono"><%= brand.domain %></span>
-  </footer>
-</div>
 </body>
 </html>
