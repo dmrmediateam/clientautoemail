@@ -43,6 +43,7 @@ function rowToClient(row, settings) {
       buyer_template_body: buyerBody,
       seller_template_subject: effectiveSettings.seller_template_subject || buyerSubject,
       seller_template_body: effectiveSettings.seller_template_body || buyerBody,
+      cc_email: effectiveSettings.cc_email || '',
     },
     google: {
       access_token: row.google_access_token_encrypted ? enc.decrypt(row.google_access_token_encrypted) : null,
@@ -161,6 +162,7 @@ async function update(id, patch) {
     send_window_end: patch.send_window_end ?? undefined,
     timezone: patch.timezone ?? undefined,
     daily_send_limit: patch.daily_send_limit ?? undefined,
+    cc_email: patch.cc_email ?? undefined,
   });
   return findById(id);
 }

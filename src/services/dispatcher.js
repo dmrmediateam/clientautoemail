@@ -83,6 +83,7 @@ async function processLead({ client, rawPayload }) {
   });
 
   const status = overLimit ? 'rate_limited' : 'queued';
+  const ccEmail = client.settings?.cc_email || '';
   const message = await messagesRepo.create({
     conversation_id: conversation.id,
     client_id: client.id,

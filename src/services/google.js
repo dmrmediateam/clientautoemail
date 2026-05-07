@@ -103,12 +103,13 @@ function encodeHeaderIfNeeded(s) {
   return `=?UTF-8?B?${Buffer.from(str, 'utf8').toString('base64')}?=`;
 }
 
-function buildRfc822({ from, to, replyTo, subject, body, inReplyTo, references }) {
+function buildRfc822({ from, to, cc, replyTo, subject, body, inReplyTo, references }) {
   const bodyBytes = Buffer.from(String(body || ''), 'utf8').toString('base64');
   const bodyFolded = (bodyBytes.match(/.{1,76}/g) || ['']).join('\r\n');
   const headers = [
     `From: ${formatAddress(from)}`,
     `To: ${formatAddress(to)}`,
+    cc && cc.email ? `Cc: ${formatAddress(cc)}` : null,
     replyTo ? `Reply-To: ${formatAddress(replyTo)}` : null,
     `Subject: ${encodeHeaderIfNeeded(subject)}`,
     inReplyTo ? `In-Reply-To: ${inReplyTo}` : null,
@@ -125,7 +126,7 @@ function toBase64Url(s) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function sendAsClient(client, { to, subject, body, replyTo, threadId, inReplyTo, references }) {
+async function sendAsClient(client, { to, cc, subject, body, replyTo, threadId, inReplyTo, references }) {
   await ensureFreshToken(client);
   const fresh = await clientsRepo.findById(client.id);
 
@@ -143,6 +144,7 @@ async function sendAsClient(client, { to, subject, body, replyTo, threadId, inRe
   const raw = toBase64Url(buildRfc822({
     from,
     to,
+    cc: cc || null,
     replyTo: replyToAddr,
     subject,
     body,

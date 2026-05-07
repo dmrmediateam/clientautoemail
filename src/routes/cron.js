@@ -29,8 +29,10 @@ router.post('/send-queued', async (req, res) => {
         out.failed += 1;
         continue;
       }
+      const ccEmail = client.settings?.cc_email || '';
       const result = await google.sendAsClient(client, {
         to: { email: msg.to_email, name: conv.lead_name || '' },
+        cc: ccEmail ? { email: ccEmail } : null,
         subject: msg.subject,
         body: msg.body,
         threadId: conv.thread_id || msg.gmail_thread_id || undefined,

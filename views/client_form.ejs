@@ -49,6 +49,10 @@
   <p class="help">Plain text only. Placeholders: <span class="mono">{{first_name}} {{full_name}} {{email}} {{phone}} {{property_address}} {{property_url}} {{message}} {{agent_name}} {{agent_phone}}</span></p>
 
   <h2>Delivery (optional)</h2>
+  <label>CC email (always copied on every outbound email)</label>
+  <input class="input" type="email" name="cc_email" value="<%= client.settings?.cc_email || '' %>" placeholder="partner@example.com" />
+  <p class="help">Leave blank for none. Use this to CC a second agent on all leads for this client.</p>
+
   <label>SendGrid API key (per-client override)</label>
   <input class="input" name="sendgrid_api_key" value="<%= client.sendgrid_api_key || '' %>" placeholder="leave blank to use master key" />
   <p class="help">If blank, the system master key is used. Per-client keys are stored encrypted (AES-256-GCM).</p>

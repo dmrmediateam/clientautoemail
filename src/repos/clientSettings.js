@@ -14,6 +14,7 @@ function defaultSettings() {
     buyer_template_body: '',
     seller_template_subject: 'Question about your home at {{property_address}}',
     seller_template_body: '',
+    cc_email: '',
   };
 }
 
@@ -28,6 +29,7 @@ function rowOut(row) {
     buyer_template_body: row.buyer_template_body,
     seller_template_subject: row.seller_template_subject,
     seller_template_body: row.seller_template_body,
+    cc_email: row.cc_email || '',
     created_at: Number(row.created_at || 0),
     updated_at: Number(row.updated_at || 0),
   };
@@ -50,8 +52,8 @@ async function upsert(clientId, patch = {}) {
     `INSERT INTO client_settings (
       client_id, send_window_start, send_window_end, timezone, daily_send_limit,
       buyer_template_subject, buyer_template_body, seller_template_subject, seller_template_body,
-      created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+      cc_email, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
     ON CONFLICT (client_id) DO UPDATE SET
       send_window_start = EXCLUDED.send_window_start,
       send_window_end = EXCLUDED.send_window_end,
@@ -61,6 +63,7 @@ async function upsert(clientId, patch = {}) {
       buyer_template_body = EXCLUDED.buyer_template_body,
       seller_template_subject = EXCLUDED.seller_template_subject,
       seller_template_body = EXCLUDED.seller_template_body,
+      cc_email = EXCLUDED.cc_email,
       updated_at = EXCLUDED.updated_at`,
     [
       clientId,
@@ -72,6 +75,7 @@ async function upsert(clientId, patch = {}) {
       next.buyer_template_body,
       next.seller_template_subject,
       next.seller_template_body,
+      next.cc_email || '',
       ts,
     ]
   );

@@ -115,6 +115,9 @@ router.post('/clients/:id', async (req, res, next) => {
     if (b.sendgrid_api_key !== undefined) {
       patch.sendgrid_api_key = b.sendgrid_api_key.trim() || null;
     }
+    if (b.cc_email !== undefined) {
+      patch.cc_email = b.cc_email.trim() || '';
+    }
     await clientsRepo.update(id, patch);
     res.redirect(`/admin/clients/${id}?updated=1`);
   } catch (err) { next(err); }
