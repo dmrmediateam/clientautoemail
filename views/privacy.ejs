@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy — <%= brand.name %></title>
+<link rel="stylesheet" href="/static/css/dmr.css" />
+<style>
+  .legal { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+  .legal h1 { font-size: 32px; margin-bottom: 6px; }
+  .legal .meta { color: var(--fg-muted); font-size: 13px; margin-bottom: 40px; }
+  .legal h2 { font-size: 18px; margin: 36px 0 12px; color: var(--accent); }
+  .legal p, .legal li { font-size: 15px; line-height: 1.7; color: var(--fg-muted); }
+  .legal ul { padding-left: 20px; margin: 0 0 16px; }
+  .legal li { margin-bottom: 6px; }
+  .legal a { color: var(--accent); }
+  .legal .highlight { background: rgba(201,166,107,.1); border: 1px solid rgba(201,166,107,.25); border-radius: 8px; padding: 16px 20px; margin: 20px 0; }
+  .legal .highlight p { margin: 0; color: var(--fg); }
+  .top-strip { padding: 18px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top-strip">
+    <div class="brand">
+      <div class="brand-mark">DMR</div>
+      <div class="brand-text">
+        <span class="name"><%= brand.name %></span>
+        <span class="tagline"><%= brand.tagline %></span>
+      </div>
+    </div>
+    <a class="btn btn-ghost" href="/onboarding" style="font-size:13px">&#8592; Back</a>
+  </div>
+
+  <main class="main" style="padding-top:0">
+    <div class="legal">
+      <h1>Privacy Policy</h1>
+      <p class="meta">Last updated: May 7, 2026 &nbsp;·&nbsp; <a href="/terms">Terms of Service</a></p>
+
+      <div class="highlight">
+        <p><strong>Plain-English summary:</strong> We connect your Gmail account so we can send automated lead-response emails on your behalf. We never read your inbox. We never sell your data. You can disconnect at any time.</p>
+      </div>
+
+      <h2>1. Who we are</h2>
+      <p><%= brand.name %> ("<strong>DMR Media</strong>", "we", "us", "our") operates the Lead Response Bridge at <a href="https://<%= brand.domain %>"><%= brand.domain %></a>. We help real estate agents automatically reply to new leads via their own Gmail account.</p>
+      <p>Contact: <a href="mailto:team@dmrmedia.org">team@dmrmedia.org</a></p>
+
+      <h2>2. Information we collect</h2>
+      <ul>
+        <li><strong>Google account information</strong> — your Gmail address, obtained when you connect your Google account via OAuth 2.0.</li>
+        <li><strong>OAuth tokens</strong> — access and refresh tokens issued by Google, stored encrypted (AES-256-GCM) in our database. Used solely to send email on your behalf.</li>
+        <li><strong>Lead data</strong> — name, email address, phone number, and property details submitted to your webhook URL by your lead generation platform (e.g. Luxury Presence). This data is used only to compose and send your automated reply.</li>
+        <li><strong>Sent message records</strong> — subject line, body, recipient, and send status, stored for your dashboard history.</li>
+        <li><strong>Agent profile</strong> — your name, phone number, brokerage name, and website that you provide to personalize outgoing emails.</li>
+      </ul>
+      <p>We do <strong>not</strong> collect or store payment information, read your Gmail inbox, access any emails beyond what we send, or collect any data beyond what is necessary to operate the service.</p>
+
+      <h2>3. How we use your information</h2>
+      <ul>
+        <li>To send automated lead-response emails from your Gmail account, using the Gmail API (<code>gmail.send</code> scope only).</li>
+        <li>To display your lead history and sent email log on your dashboard.</li>
+        <li>To personalize email content with your name, phone, and brokerage details.</li>
+        <li>To maintain the security and integrity of the service.</li>
+      </ul>
+      <p>We do <strong>not</strong> use your data for advertising, analytics sold to third parties, or any purpose beyond operating this service.</p>
+
+      <h2>4. Google API scopes</h2>
+      <p>We request only the <strong><code>gmail.send</code></strong> OAuth scope from Google. This grants us permission to send email on your behalf. It does <strong>not</strong> grant us access to read, modify, or delete any emails in your inbox or any other folder.</p>
+      <p>Our use of Google user data complies with the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+      <h2>5. Data storage and security</h2>
+      <ul>
+        <li>All data is stored in a PostgreSQL database hosted on <a href="https://neon.tech" target="_blank" rel="noopener">Neon</a> (US East region) with encryption at rest.</li>
+        <li>OAuth tokens are encrypted with AES-256-GCM before storage. The encryption key is never stored in the database.</li>
+        <li>All data in transit is encrypted via TLS 1.2+.</li>
+        <li>Access to the database is restricted to the application server only.</li>
+      </ul>
+
+      <h2>6. Data sharing</h2>
+      <p>We do not sell, rent, or share your personal data with third parties, except:</p>
+      <ul>
+        <li><strong>Google</strong> — to authenticate you and send emails via the Gmail API.</li>
+        <li><strong>Infrastructure providers</strong> — Vercel (hosting) and Neon (database), who process data solely to provide us with infrastructure services and are bound by their own privacy policies.</li>
+        <li><strong>Legal requirements</strong> — if required by law or valid legal process.</li>
+      </ul>
+
+      <h2>7. Data retention</h2>
+      <p>We retain your data for as long as your account is active. If you disconnect your Google account and request deletion, we will delete your OAuth tokens immediately and your lead/message history within 30 days. To request deletion, email <a href="mailto:team@dmrmedia.org">team@dmrmedia.org</a>.</p>
+
+      <h2>8. Your rights</h2>
+      <p>You may at any time:</p>
+      <ul>
+        <li><strong>Disconnect Google</strong> — use the "Disconnect Google" button in your dashboard. This immediately revokes our access and deletes your stored tokens.</li>
+        <li><strong>Request data export or deletion</strong> — email <a href="mailto:team@dmrmedia.org">team@dmrmedia.org</a>.</li>
+        <li><strong>Revoke access via Google</strong> — visit <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> and remove "DMR Lead Responder" at any time.</li>
+      </ul>
+
+      <h2>9. Children's privacy</h2>
+      <p>This service is intended for real estate professionals and is not directed to individuals under 18. We do not knowingly collect data from minors.</p>
+
+      <h2>10. Changes to this policy</h2>
+      <p>We may update this policy from time to time. We will post the updated date at the top of this page. Continued use of the service after changes constitutes acceptance of the updated policy.</p>
+
+      <h2>11. Contact</h2>
+      <p>Questions about this policy: <a href="mailto:team@dmrmedia.org">team@dmrmedia.org</a><br>
+      DMR Media · <a href="https://<%= brand.domain %>"><%= brand.domain %></a></p>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
+    <span class="mono" style="font-size:11px"><%= brand.domain %></span>
+  </footer>
+</div>
+</body>
+</html>

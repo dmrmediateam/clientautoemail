@@ -15,4 +15,12 @@ router.get('/onboarding', (req, res) => {
   });
 });
 
+router.get('/privacy', (req, res) => {
+  res.render('privacy', { brand: config.brand });
+});
+
+router.get('/terms', (req, res) => {
+  res.render('terms', { brand: config.brand });
+});
+
 module.exports = router;

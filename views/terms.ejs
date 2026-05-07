@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terms of Service — <%= brand.name %></title>
+<link rel="stylesheet" href="/static/css/dmr.css" />
+<style>
+  .legal { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+  .legal h1 { font-size: 32px; margin-bottom: 6px; }
+  .legal .meta { color: var(--fg-muted); font-size: 13px; margin-bottom: 40px; }
+  .legal h2 { font-size: 18px; margin: 36px 0 12px; color: var(--accent); }
+  .legal p, .legal li { font-size: 15px; line-height: 1.7; color: var(--fg-muted); }
+  .legal ul { padding-left: 20px; margin: 0 0 16px; }
+  .legal li { margin-bottom: 6px; }
+  .legal a { color: var(--accent); }
+  .top-strip { padding: 18px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top-strip">
+    <div class="brand">
+      <div class="brand-mark">DMR</div>
+      <div class="brand-text">
+        <span class="name"><%= brand.name %></span>
+        <span class="tagline"><%= brand.tagline %></span>
+      </div>
+    </div>
+    <a class="btn btn-ghost" href="/onboarding" style="font-size:13px">&#8592; Back</a>
+  </div>
+
+  <main class="main" style="padding-top:0">
+    <div class="legal">
+      <h1>Terms of Service</h1>
+      <p class="meta">Last updated: May 7, 2026 &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a></p>
+
+      <h2>1. Acceptance</h2>
+      <p>By connecting your Google account and using the <%= brand.name %> Lead Response Bridge ("Service"), you agree to these Terms of Service ("Terms"). If you do not agree, do not use the Service.</p>
+
+      <h2>2. Description of service</h2>
+      <p>The Service enables real estate professionals to automatically send personalized email replies to new leads through their own Gmail account, triggered by webhooks from lead generation platforms. Emails are sent via the Gmail API using OAuth 2.0 credentials you authorize.</p>
+
+      <h2>3. Permitted use</h2>
+      <ul>
+        <li>You may use the Service only for legitimate professional real estate lead response communications.</li>
+        <li>You must comply with all applicable laws, including CAN-SPAM, CASL, and GDPR where applicable.</li>
+        <li>You are solely responsible for the content of emails sent through the Service.</li>
+        <li>You must have a lawful basis to contact lead recipients (e.g. they submitted an inquiry to your platform).</li>
+      </ul>
+
+      <h2>4. Prohibited use</h2>
+      <p>You may not use the Service to:</p>
+      <ul>
+        <li>Send spam, unsolicited bulk email, or harassing communications.</li>
+        <li>Impersonate another person or misrepresent your identity.</li>
+        <li>Violate any Google API Terms of Service or Gmail usage policies.</li>
+        <li>Reverse-engineer, resell, or sublicense the Service without written permission.</li>
+      </ul>
+
+      <h2>5. Google OAuth and API use</h2>
+      <p>You authorize DMR Media to use your Google OAuth credentials solely to send email on your behalf via the <code>gmail.send</code> API scope. You may revoke this authorization at any time from your dashboard or via <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>. Revoking access stops all automated sending immediately.</p>
+
+      <h2>6. Account responsibility</h2>
+      <p>You are responsible for maintaining the security of your Google account and for all activity that occurs under your account. Notify us immediately at <a href="mailto:team@dmrmedia.org">team@dmrmedia.org</a> if you suspect unauthorized use.</p>
+
+      <h2>7. Service availability</h2>
+      <p>We will make reasonable efforts to maintain availability but do not guarantee uninterrupted service. The Service is provided on an "as is" and "as available" basis. Sending windows, rate limits, and delivery are subject to Google API availability and limits.</p>
+
+      <h2>8. Disclaimer of warranties</h2>
+      <p>To the maximum extent permitted by law, DMR Media disclaims all warranties, express or implied, including warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not guarantee that every lead will receive a reply or that emails will be delivered.</p>
+
+      <h2>9. Limitation of liability</h2>
+      <p>DMR Media shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of or inability to use the Service, including lost business opportunities, missed leads, or failed email delivery. Our total liability shall not exceed the amount you paid us in the 3 months preceding the claim.</p>
+
+      <h2>10. Termination</h2>
+      <p>We may suspend or terminate your access if you violate these Terms. You may terminate at any time by disconnecting your Google account from the dashboard. Upon termination, your OAuth tokens are revoked and deleted.</p>
+
+      <h2>11. Changes to terms</h2>
+      <p>We may update these Terms at any time. We will post the updated date at the top of this page. Continued use after changes constitutes acceptance.</p>
+
+      <h2>12. Governing law</h2>
+      <p>These Terms are governed by the laws of the State of Texas, without regard to conflict-of-law principles.</p>
+
+      <h2>13. Contact</h2>
+      <p>Questions: <a href="mailto:team@dmrmedia.org">team@dmrmedia.org</a><br>
+      DMR Media · <a href="https://<%= brand.domain %>"><%= brand.domain %></a></p>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
+    <span class="mono" style="font-size:11px"><%= brand.domain %></span>
+  </footer>
+</div>
+</body>
+</html>
