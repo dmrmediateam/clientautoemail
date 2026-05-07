@@ -4,22 +4,41 @@ const express = require('express');
 const crypto = require('crypto');
 const google = require('../services/google');
 const clientsRepo = require('../repos/clients');
+const config = require('../config');
 const { issueClientSession, clearClientSession } = require('../middleware/auth');
 
 const router = express.Router();
 
-const STATE_COOKIE = 'dmr_oauth_state';
+// HMAC-signed stateless OAuth state — no cookie required, works in serverless environments.
+function _stateSecret() {
+  return config.admin.sessionSecret || config.encryptionKey || '';
+}
+
+function _makeState() {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const sig = crypto.createHmac('sha256', _stateSecret()).update(nonce).digest('hex');
+  return `${nonce}.${sig}`;
+}
+
+function _verifyState(state) {
+  if (!state || typeof state !== 'string') return false;
+  const dot = state.lastIndexOf('.');
+  if (dot < 1) return false;
+  const nonce = state.slice(0, dot);
+  const sig = state.slice(dot + 1);
+  const expected = crypto.createHmac('sha256', _stateSecret()).update(nonce).digest('hex');
+  try {
+    const sBuf = Buffer.from(sig, 'hex');
+    const eBuf = Buffer.from(expected, 'hex');
+    return sBuf.length === eBuf.length && crypto.timingSafeEqual(sBuf, eBuf);
+  } catch {
+    return false;
+  }
+}
 
 router.get('/google/start', (req, res) => {
-  const stateNonce = crypto.randomBytes(16).toString('hex');
-  res.cookie(STATE_COOKIE, stateNonce, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: req.app.get('env') === 'production',
-    maxAge: 10 * 60 * 1000,
-    path: '/',
-  });
-  const url = google.generateAuthUrl(stateNonce);
+  const state = _makeState();
+  const url = google.generateAuthUrl(state);
   res.redirect(url);
 });
 
@@ -28,11 +47,9 @@ router.get('/google/callback', async (req, res) => {
   if (error) return res.status(400).send(`Google returned error: ${error}`);
   if (!code || !state) return res.status(400).send('Missing code or state');
 
-  const cookieState = req.cookies?.[STATE_COOKIE];
-  if (!cookieState || cookieState !== state) {
+  if (!_verifyState(String(state))) {
     return res.status(400).send('Invalid OAuth state — possible CSRF or expired flow. Try again.');
   }
-  res.clearCookie(STATE_COOKIE, { path: '/' });
 
   let tokens;
   try {
