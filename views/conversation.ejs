@@ -1,15 +1,70 @@
 <%
-  const title = 'Conversation';
-  const page = 'dashboard';
-  const bubbleClass = (dir) => dir === 'outbound' ? 'badge-on' : 'badge-off';
+  const title = (conversation.lead_name || conversation.lead_email);
+  const lastMsg = messages[messages.length - 1];
+  const replySubject = lastMsg ? 'Re: ' + (lastMsg.subject || 'Your inquiry') : 'Re: Your inquiry';
+  const leadInitials = (conversation.lead_name || conversation.lead_email || '?')
+    .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  function fmtTs(ms) {
+    if (!ms) return '';
+    const d = new Date(Number(ms));
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+           ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
 %>
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title><%= title %> — <%= brand.name %> · <%= brand.tagline %></title>
+<title><%= title %> — <%= brand.name %></title>
 <link rel="stylesheet" href="/static/css/dmr.css" />
+<style>
+  .conv-layout {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 780px) { .conv-layout { grid-template-columns: 1fr; } }
+
+  .lead-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; position: sticky; top: 20px; }
+  .lead-card-header { background: linear-gradient(135deg, rgba(201,166,107,.12) 0%, transparent 100%); padding: 20px; border-bottom: 1px solid var(--border); text-align: center; }
+  .lead-avatar { width: 56px; height: 56px; border-radius: 50%; background: rgba(201,166,107,.2); border: 2px solid rgba(201,166,107,.4); display: grid; place-items: center; font-size: 18px; font-weight: 700; color: var(--accent); margin: 0 auto 12px; letter-spacing: 1px; }
+  .lead-name  { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .lead-email-line { font-size: 12px; color: var(--fg-muted); font-family: var(--mono); word-break: break-all; }
+  .lead-fields { padding: 8px 16px 12px; }
+  .lead-field { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .lead-field:last-child { border-bottom: 0; }
+  .field-icon { font-size: 14px; width: 20px; flex-shrink: 0; text-align: center; margin-top: 1px; opacity: .75; }
+  .field-body { flex: 1; min-width: 0; }
+  .field-label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--fg-muted); margin-bottom: 2px; }
+  .field-value { font-size: 13px; word-break: break-word; line-height: 1.4; }
+  .lead-channels { padding: 12px 16px; border-top: 1px solid var(--border); }
+  .channel-row-label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--fg-muted); margin-bottom: 8px; }
+  .cpills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cpill { font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--fg-muted); background: var(--surface-2); cursor: default; }
+  .cpill.on { border-color: rgba(201,166,107,.5); color: var(--accent); background: rgba(201,166,107,.08); }
+
+  .thread-wrap { display: flex; flex-direction: column; gap: 18px; }
+  .bubble-row { display: flex; flex-direction: column; }
+  .bubble-row.outbound { align-items: flex-end; }
+  .bubble-row.inbound  { align-items: flex-start; }
+  .bubble-meta { font-size: 11px; color: var(--fg-muted); font-family: var(--mono); margin-bottom: 4px; }
+  .bubble { max-width: 82%; border-radius: 16px; padding: 12px 16px; }
+  .bubble.outbound { background: rgba(201,166,107,.16); border: 1px solid rgba(201,166,107,.32); border-bottom-right-radius: 4px; }
+  .bubble.inbound  { background: var(--surface-2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .bubble-subject { font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: .75; }
+  .bubble-body    { font-size: 13px; line-height: 1.65; white-space: pre-wrap; }
+  .bubble-foot    { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .bubble-foot .dim { font-size: 10px; color: var(--fg-muted); font-family: var(--mono); }
+
+  .reply-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .reply-hd { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .reply-hd strong { font-size: 14px; }
+  .reply-bd { padding: 16px 18px; }
+  .reply-bd .textarea { min-height: 130px; }
+  .reply-ft { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+</style>
 </head>
 <body>
 <div class="shell">
@@ -22,59 +77,180 @@
       </div>
     </div>
     <nav class="nav">
-      <a href="/dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>">Dashboard</a>
+      <a href="/dashboard" class="active">Dashboard</a>
       <a href="/dashboard/template">Template</a>
-      <span style="color:var(--fg-muted);font-size:12px;margin:0 6px"><%= client.google.email || client.agent_email %></span>
+      <span style="color:var(--fg-muted);font-size:12px;padding:0 6px"><%= client.google.email || client.agent_email %></span>
       <form action="/auth/logout" method="post" style="display:inline">
         <button class="btn btn-ghost" type="submit">Sign out</button>
       </form>
     </nav>
   </header>
+
   <main class="main">
-  <% if (typeof flash !== 'undefined' && flash) { %>
-    <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
-  <% } %>
-
-  <h1><%= conversation.lead_name || conversation.lead_email %></h1>
-  <p class="lede"><span class="mono"><%= conversation.lead_email %></span> · <span class="badge"><%= conversation.lead_type || 'buyer' %></span></p>
-
-  <div class="panel">
-    <h2 style="margin-top:0">Thread</h2>
-    <% if (!messages.length) { %>
-      <div class="empty">No messages yet.</div>
-    <% } else { %>
-      <% messages.forEach((m) => { %>
-        <div style="padding:12px;border:1px solid rgba(148,163,184,0.18);border-radius:12px;margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;gap:8px">
-            <strong><%= m.subject || 'No subject' %></strong>
-            <span class="badge <%= bubbleClass(m.direction) %>"><%= m.direction %> · <%= m.status %></span>
-          </div>
-          <div style="color:var(--fg-muted);font-size:12px;margin-top:4px" class="mono">
-            <%= m.from_email %> → <%= m.to_email %> · <%= new Date(m.created_at).toLocaleString() %>
-          </div>
-          <pre class="code-block" style="margin-top:10px;white-space:pre-wrap"><%= m.body %></pre>
-        </div>
-      <% }) %>
+    <% if (typeof flash !== 'undefined' && flash) { %>
+      <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
     <% } %>
-  </div>
 
-  <div class="panel">
-    <h2 style="margin-top:0">Send reply</h2>
-    <form action="/dashboard/conversations/<%= conversation.id %>/reply" method="post">
-      <label>Subject</label>
-      <input class="input" name="subject" value="<%= messages.length ? ('Re: ' + (messages[messages.length - 1].subject || 'Your inquiry')) : 'Re: Your inquiry' %>" />
-      <label>Body</label>
-      <textarea class="textarea" name="body" rows="8" placeholder="Type your reply..." required></textarea>
-      <div class="actions" style="margin-top:16px">
-        <button type="submit" class="btn btn-primary">Send now</button>
-        <a class="btn" href="/dashboard">Back</a>
+    <div style="margin-bottom:16px">
+      <a href="/dashboard" style="font-size:13px;color:var(--fg-muted);text-decoration:none">&#8592; Back to dashboard</a>
+    </div>
+
+    <div class="conv-layout">
+
+      <!-- Lead profile sidebar -->
+      <aside class="lead-card">
+        <div class="lead-card-header">
+          <div class="lead-avatar"><%= leadInitials %></div>
+          <div class="lead-name"><%= conversation.lead_name || 'Unknown Lead' %></div>
+          <div class="lead-email-line"><%= conversation.lead_email %></div>
+        </div>
+
+        <div class="lead-fields">
+          <% if (conversation.lead_phone) { %>
+          <div class="lead-field">
+            <div class="field-icon">&#128222;</div>
+            <div class="field-body">
+              <div class="field-label">Phone</div>
+              <div class="field-value"><%= conversation.lead_phone %></div>
+            </div>
+          </div>
+          <% } %>
+
+          <div class="lead-field">
+            <div class="field-icon">&#127991;</div>
+            <div class="field-body">
+              <div class="field-label">Lead type</div>
+              <div class="field-value">
+                <span class="badge <%= conversation.lead_type === 'seller' ? 'badge-warn' : 'badge-off' %>"><%= conversation.lead_type || 'buyer' %></span>
+              </div>
+            </div>
+          </div>
+
+          <% if (conversation.property_address) { %>
+          <div class="lead-field">
+            <div class="field-icon">&#127968;</div>
+            <div class="field-body">
+              <div class="field-label">Property</div>
+              <div class="field-value"><%= conversation.property_address %></div>
+            </div>
+          </div>
+          <% } %>
+
+          <% if (conversation.source) { %>
+          <div class="lead-field">
+            <div class="field-icon">&#128225;</div>
+            <div class="field-body">
+              <div class="field-label">Source</div>
+              <div class="field-value"><%= conversation.source %></div>
+            </div>
+          </div>
+          <% } %>
+
+          <div class="lead-field">
+            <div class="field-icon">&#128336;</div>
+            <div class="field-body">
+              <div class="field-label">Lead received</div>
+              <div class="field-value"><%= fmtTs(conversation.created_at) %></div>
+            </div>
+          </div>
+
+          <div class="lead-field">
+            <div class="field-icon">&#128172;</div>
+            <div class="field-body">
+              <div class="field-label">Messages</div>
+              <div class="field-value"><%= messages.length %> in thread</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lead-channels">
+          <div class="channel-row-label">Notify via</div>
+          <div class="cpills">
+            <span class="cpill on">Email</span>
+            <span class="cpill" title="Coming soon">WhatsApp</span>
+            <span class="cpill" title="Coming soon">SMS</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Thread + reply -->
+      <div style="display:flex;flex-direction:column;gap:20px">
+
+        <div class="panel" style="padding:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <h2 style="margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--fg-muted)">Thread</h2>
+            <span style="font-size:12px;color:var(--fg-muted)"><%= messages.length %> message<%= messages.length !== 1 ? 's' : '' %></span>
+          </div>
+
+          <% if (!messages.length) { %>
+            <div style="text-align:center;padding:40px 20px;color:var(--fg-muted);font-size:14px">No messages yet in this thread.</div>
+          <% } else { %>
+            <div class="thread-wrap">
+              <% messages.forEach(function(m) {
+                const isOut = m.direction === 'outbound';
+                const statusMap = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn' };
+                const sc = statusMap[m.status] || 'badge-off';
+                const ts = fmtTs(m.sent_at || m.created_at);
+                const fromLabel = isOut
+                  ? (client.google.email || client.agent_email || 'You')
+                  : (m.from_email || conversation.lead_email);
+              %>
+              <div class="bubble-row <%= m.direction %>">
+                <div class="bubble-meta">
+                  <% if (isOut) { %>
+                    <strong>You</strong> &rarr; <%= m.to_email %> &middot; <%= ts %>
+                  <% } else { %>
+                    <strong><%= fromLabel %></strong> &rarr; You &middot; <%= ts %>
+                  <% } %>
+                </div>
+                <div class="bubble <%= m.direction %>">
+                  <div class="bubble-subject"><%= m.subject || '(no subject)' %></div>
+                  <div class="bubble-body"><%= m.body %></div>
+                  <div class="bubble-foot">
+                    <span class="badge <%= sc %>"><%= m.status %></span>
+                    <% if (m.gmail_message_id) { %>
+                      <span class="dim">Gmail: <%= m.gmail_message_id.slice(0, 14) %>&#8230;</span>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="reply-panel">
+          <div class="reply-hd">
+            <strong>Send reply</strong>
+            <span style="font-size:12px;color:var(--fg-muted)">to <span class="mono"><%= conversation.lead_email %></span></span>
+          </div>
+          <form action="/dashboard/conversations/<%= conversation.id %>/reply" method="post">
+            <div class="reply-bd">
+              <label>Subject</label>
+              <input class="input" name="subject" value="<%= replySubject %>" style="margin-bottom:12px" />
+              <label>Body</label>
+              <textarea class="textarea" name="body" rows="8" placeholder="Type your reply..." required></textarea>
+            </div>
+            <div class="reply-ft">
+              <div class="cpills">
+                <span class="cpill on">Email</span>
+                <span class="cpill" title="Coming soon">WhatsApp</span>
+              </div>
+              <div style="display:flex;gap:8px">
+                <a class="btn" href="/dashboard">Cancel</a>
+                <button type="submit" class="btn btn-primary"<%= !client.google.connected ? ' disabled title="Connect Gmail first"' : '' %>>Send reply</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
       </div>
-    </form>
-  </div>
+    </div>
   </main>
+
   <footer class="foot">
     <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
-    <span class="mono"><%= brand.domain %></span>
+    <span class="mono" style="font-size:11px"><%= brand.domain %></span>
   </footer>
 </div>
 </body>
