@@ -23,7 +23,10 @@ async function processLead({ client, rawPayload }) {
     ? client.templates?.seller || client.template
     : client.templates?.buyer || client.template;
   const subject = tpl.render(template.subject, data);
-  const body = tpl.render(template.body, data);
+  let body = tpl.render(template.body, data);
+  if (settings.team_signature_enabled) {
+    body = body.trimEnd() + `\n${client.name} Team`;
+  }
   const fromEmail = client.google.email || client.agent_email;
 
   const conversation = await conversationsRepo.findOrCreateForLead({

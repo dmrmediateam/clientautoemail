@@ -18,6 +18,7 @@ function defaultSettings() {
     send_from_email: '',
     buyer_sender_email: '',
     seller_sender_email: '',
+    team_signature_enabled: false,
   };
 }
 
@@ -36,6 +37,7 @@ function rowOut(row) {
     send_from_email: row.send_from_email || '',
     buyer_sender_email: row.buyer_sender_email || '',
     seller_sender_email: row.seller_sender_email || '',
+    team_signature_enabled: !!row.team_signature_enabled,
     created_at: Number(row.created_at || 0),
     updated_at: Number(row.updated_at || 0),
   };
@@ -58,8 +60,8 @@ async function upsert(clientId, patch = {}) {
     `INSERT INTO client_settings (
       client_id, send_window_start, send_window_end, timezone, daily_send_limit,
       buyer_template_subject, buyer_template_body, seller_template_subject, seller_template_body,
-      cc_email, send_from_email, buyer_sender_email, seller_sender_email, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+      cc_email, send_from_email, buyer_sender_email, seller_sender_email, team_signature_enabled, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
     ON CONFLICT (client_id) DO UPDATE SET
       send_window_start = EXCLUDED.send_window_start,
       send_window_end = EXCLUDED.send_window_end,
@@ -73,6 +75,7 @@ async function upsert(clientId, patch = {}) {
       send_from_email = EXCLUDED.send_from_email,
       buyer_sender_email = EXCLUDED.buyer_sender_email,
       seller_sender_email = EXCLUDED.seller_sender_email,
+      team_signature_enabled = EXCLUDED.team_signature_enabled,
       updated_at = EXCLUDED.updated_at`,
     [
       clientId,
@@ -88,6 +91,7 @@ async function upsert(clientId, patch = {}) {
       next.send_from_email || '',
       next.buyer_sender_email || '',
       next.seller_sender_email || '',
+      next.team_signature_enabled ? true : false,
       ts,
     ]
   );

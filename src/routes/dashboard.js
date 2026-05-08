@@ -80,6 +80,7 @@ router.post('/template', async (req, res, next) => {
       seller_template_body: sellerBody,
       buyer_sender_email: (req.body.buyer_sender_email || '').trim().toLowerCase(),
       seller_sender_email: (req.body.seller_sender_email || '').trim().toLowerCase(),
+      team_signature_enabled: req.body.team_signature_enabled === 'on',
       send_window_start: (req.body.send_window_start || req.client.settings?.send_window_start || '08:30').trim(),
       send_window_end: (req.body.send_window_end || req.client.settings?.send_window_end || '18:00').trim(),
       timezone: (req.body.timezone || req.client.settings?.timezone || 'America/Chicago').trim(),
