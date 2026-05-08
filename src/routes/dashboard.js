@@ -29,10 +29,13 @@ router.get('/', async (req, res, next) => {
       conversationsRepo.listWithPreview(req.client.id, 50),
       messagesRepo.listRecentByClient(req.client.id, 100),
     ]);
+    const teamMembers = await clientsRepo.listUsersForClient(req.client.id);
     res.render('client_dashboard', {
       brand: config.brand,
       publicBaseUrl: config.publicBaseUrl,
       client: req.client,
+      currentUser: req.currentUser || null,
+      teamMembers,
       conversations,
       recentMessages,
       nextSendAt: nextWindowStart({

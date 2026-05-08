@@ -127,7 +127,7 @@ router.get('/google/callback', async (req, res) => {
   } catch (err) {
     console.warn('[oauth] gmail watch setup skipped:', err.message);
   }
-  issueClientSession(res, client.id);
+  issueClientSession(res, client.id, email);
   res.redirect('/dashboard?connected=1');
 });
 

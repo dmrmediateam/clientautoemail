@@ -84,7 +84,12 @@
     <nav class="nav">
       <a href="/dashboard" class="active">Dashboard</a>
       <a href="/dashboard/template">Template</a>
-      <span style="color:var(--fg-muted);font-size:12px;padding:0 6px"><%= client.google.email || client.agent_email %></span>
+      <span style="color:var(--fg-muted);font-size:12px;padding:0 6px">
+        <% var _me = currentUser ? currentUser.email : (client.google.email || client.agent_email); %>
+        <%= _me %>
+        <span style="margin-left:4px;opacity:.5">·</span>
+        <span style="color:var(--accent)"><%= client.name %></span>
+      </span>
       <form action="/auth/logout" method="post" style="display:inline">
         <button class="btn btn-ghost" type="submit">Sign out</button>
       </form>
@@ -105,7 +110,7 @@
         <div>
           <% if (isLive) { %>
             <span class="badge badge-on">Live</span>
-            <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Responding via <span class="mono"><%= client.google.email %></span></span>
+            <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Sending via <span class="mono"><%= client.settings.send_from_email || client.google.email %></span></span>
           <% } else if (!client.google.connected) { %>
             <span class="badge badge-warn">Needs Setup</span>
             <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Connect Gmail below to go live.</span>
@@ -114,7 +119,14 @@
             <span style="color:var(--fg-muted);font-size:13px;margin-left:8px">Webhooks are being ignored.</span>
           <% } %>
         </div>
-        <div class="sub"><%= client.name %><% if (client.website) { %> · <%= client.website %><% } %></div>
+        <div class="sub">
+          Team: <strong><%= client.name %></strong>
+          <% if (currentUser) { %>
+            &nbsp;·&nbsp; Signed in as <span class="mono" style="font-size:12px"><%= currentUser.email %></span>
+            <span class="badge" style="font-size:10px;padding:2px 6px;margin-left:4px;vertical-align:middle"><%= currentUser.role %></span>
+          <% } %>
+          <% if (client.website) { %> · <%= client.website %><% } %>
+        </div>
       </div>
       <div class="actions">
         <a class="btn" href="/dashboard/template">Edit template</a>
