@@ -172,19 +172,52 @@ router.post('/conversations/:id/reply', async (req, res, next) => {
     const subject = (req.body.subject || '').trim() || `Re: ${conversation.property_address || 'Your inquiry'}`;
     const lastMessages = await messagesRepo.listForConversation(conversation.id);
     const latest = lastMessages[lastMessages.length - 1] || null;
-    const sendResult = await google.sendAsClient(req.client, {
+
+    // Pick sender: per-type designated sender → client-level tokens
+    const leadType = conversation.lead_type || 'buyer';
+    const perTypeSender = leadType === 'seller'
+      ? (req.client.settings?.seller_sender_email || '')
+      : (req.client.settings?.buyer_sender_email || '');
+    const sendFromEmail = perTypeSender || req.client.settings?.send_from_email || '';
+
+    let senderUser = null;
+    if (sendFromEmail) {
+      const teamUsers = await clientsRepo.listUsersForClient(req.client.id);
+      senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected) || null;
+    }
+
+    const sendOpts = {
       to: { email: conversation.lead_email, name: conversation.lead_name || '' },
       subject,
       body,
       threadId: conversation.thread_id || latest?.gmail_thread_id || undefined,
       inReplyTo: latest?.internet_message_id || undefined,
       references: latest?.internet_message_id || undefined,
-    });
+    };
+
+    async function trySend(opts) {
+      if (senderUser) return google.sendAsUserRow(senderUser, req.client.agent_name, opts);
+      return google.sendAsClient(req.client, opts);
+    }
+
+    let sendResult;
+    try {
+      sendResult = await trySend(sendOpts);
+    } catch (gmailErr) {
+      // Stale thread_id → Gmail 404. Clear it and retry as a fresh email.
+      if (gmailErr.code === 404 || String(gmailErr.message).includes('not found')) {
+        await conversationsRepo.updateThreadId(conversation.id, null);
+        sendResult = await trySend({ ...sendOpts, threadId: undefined, inReplyTo: undefined, references: undefined });
+      } else {
+        throw gmailErr;
+      }
+    }
+
     await messagesRepo.create({
       conversation_id: conversation.id,
       client_id: req.client.id,
       direction: 'outbound',
-      from_email: req.client.google.email || req.client.agent_email,
+      from_email: sendFromEmail || req.client.google.email || req.client.agent_email,
       to_email: conversation.lead_email,
       subject,
       body,
