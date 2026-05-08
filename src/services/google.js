@@ -126,6 +126,70 @@ function toBase64Url(s) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+async function ensureFreshUserToken(userRow) {
+  // userRow shape: { email, access_token, refresh_token, expiry, ... } from listUsersForClient
+  if (!userRow.refresh_token) {
+    throw Object.assign(
+      new Error(`User ${userRow.email} has no Google refresh token — they need to reconnect`),
+      { code: 'GOOGLE_NOT_CONNECTED' }
+    );
+  }
+  const expired = !userRow.expiry || Date.now() > (userRow.expiry - REFRESH_LEEWAY_MS);
+  if (!expired && userRow.access_token) return userRow.access_token;
+
+  const oauth2 = buildOAuthClient();
+  oauth2.setCredentials({
+    access_token: userRow.access_token || undefined,
+    refresh_token: userRow.refresh_token,
+    expiry_date: userRow.expiry || undefined,
+  });
+  const { credentials } = await oauth2.refreshAccessToken();
+  // Persist refreshed tokens back to users row
+  await clientsRepo.saveUserGoogleTokens(userRow.email, {
+    access_token: credentials.access_token,
+    refresh_token: credentials.refresh_token,
+    expiry: credentials.expiry_date || (Date.now() + 3600 * 1000),
+    scope: credentials.scope,
+  });
+  return credentials.access_token;
+}
+
+// Send as a specific user row (multi-sender). agentName is the display name in From:.
+async function sendAsUserRow(userRow, agentName, { to, cc, subject, body, replyTo, threadId, inReplyTo, references }) {
+  const accessToken = await ensureFreshUserToken(userRow);
+
+  const oauth2 = buildOAuthClient();
+  oauth2.setCredentials({
+    access_token: accessToken,
+    refresh_token: userRow.refresh_token,
+    expiry_date: userRow.expiry,
+  });
+
+  const from = { email: userRow.email, name: agentName || userRow.name || userRow.email };
+  const replyToAddr = replyTo || from;
+
+  const raw = toBase64Url(buildRfc822({ from, to, cc: cc || null, replyTo: replyToAddr, subject, body, inReplyTo, references }));
+  const gmailClient = google.gmail({ version: 'v1', auth: oauth2 });
+
+  try {
+    const res = await gmailClient.users.messages.send({
+      userId: 'me',
+      requestBody: { raw, threadId: threadId || undefined },
+    });
+    return { messageId: res.data.id || null, threadId: res.data.threadId || null };
+  } catch (err) {
+    if (err.response?.status === 401) {
+      const e = new Error(`Gmail 401 for ${userRow.email} — token revoked`);
+      e.code = 'GOOGLE_REVOKED'; e.original = err; throw e;
+    }
+    if (err.response?.status === 403) {
+      const e = new Error(`Gmail 403 for ${userRow.email} — insufficient scope or quota`);
+      e.code = 'GOOGLE_FORBIDDEN'; e.original = err; throw e;
+    }
+    throw err;
+  }
+}
+
 async function sendAsClient(client, { to, cc, subject, body, replyTo, threadId, inReplyTo, references }) {
   await ensureFreshToken(client);
   const fresh = await clientsRepo.findById(client.id);
@@ -272,6 +336,7 @@ module.exports = {
   generateAuthUrl,
   exchangeCode,
   ensureFreshToken,
+  ensureFreshUserToken,
   sendAsClient,
   sendAsUserRow,
   listInboundMessages,

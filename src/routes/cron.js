@@ -30,13 +30,40 @@ router.post('/send-queued', async (req, res) => {
         continue;
       }
       const ccEmail = client.settings?.cc_email || '';
-      const result = await google.sendAsClient(client, {
-        to: { email: msg.to_email, name: conv.lead_name || '' },
-        cc: ccEmail ? { email: ccEmail } : null,
-        subject: msg.subject,
-        body: msg.body,
-        threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-      });
+      const sendFromEmail = client.settings?.send_from_email || '';
+
+      let result;
+      if (sendFromEmail) {
+        // Use the designated sender's per-user tokens
+        const teamUsers = await clientsRepo.listUsersForClient(client.id);
+        const senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected);
+        if (senderUser) {
+          result = await google.sendAsUserRow(senderUser, client.agent_name, {
+            to: { email: msg.to_email, name: conv.lead_name || '' },
+            cc: ccEmail ? { email: ccEmail } : null,
+            subject: msg.subject,
+            body: msg.body,
+            threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+          });
+        } else {
+          // Designated sender not connected — fall back to client-level tokens
+          result = await google.sendAsClient(client, {
+            to: { email: msg.to_email, name: conv.lead_name || '' },
+            cc: ccEmail ? { email: ccEmail } : null,
+            subject: msg.subject,
+            body: msg.body,
+            threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+          });
+        }
+      } else {
+        result = await google.sendAsClient(client, {
+          to: { email: msg.to_email, name: conv.lead_name || '' },
+          cc: ccEmail ? { email: ccEmail } : null,
+          subject: msg.subject,
+          body: msg.body,
+          threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+        });
+      }
       await messagesRepo.markSent(msg.id, {
         gmail_message_id: result.messageId,
         gmail_thread_id: result.threadId,

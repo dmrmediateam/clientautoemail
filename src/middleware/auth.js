@@ -79,8 +79,8 @@ function checkAdminCredentials(username, password) {
 
 // --- Client session ---
 
-function issueClientSession(res, clientId) {
-  const token = sign({ kind: 'client', cid: clientId, exp: Date.now() + CLIENT_MAX_AGE_MS });
+function issueClientSession(res, clientId, userEmail) {
+  const token = sign({ kind: 'client', cid: clientId, uid: userEmail || '', exp: Date.now() + CLIENT_MAX_AGE_MS });
   res.cookie(CLIENT_COOKIE, token, cookieOptions(CLIENT_MAX_AGE_MS));
 }
 
@@ -101,6 +101,10 @@ async function requireClient(req, res, next) {
       return res.redirect('/onboarding');
     }
     req.client = client;
+    // Attach the logged-in user row if email is stored in the session
+    if (payload.uid) {
+      req.currentUser = await clientsRepo.findUserByEmail(payload.uid) || null;
+    }
     next();
   } catch (err) {
     next(err);
