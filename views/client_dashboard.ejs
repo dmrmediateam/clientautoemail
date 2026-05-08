@@ -90,9 +90,15 @@
         <span style="margin-left:4px;opacity:.5">·</span>
         <span style="color:var(--accent);font-weight:600"><%= client.name %></span>
       </span>
-      <form action="/auth/logout" method="post" style="display:inline">
-        <button class="btn btn-ghost" type="submit">Sign out</button>
-      </form>
+      <% if (typeof isAdminImpersonating !== 'undefined' && isAdminImpersonating) { %>
+        <form action="/admin/stop-impersonating" method="post" style="display:inline;margin-left:6px">
+          <button class="btn" type="submit" style="background:#F59E0B;color:#000;border-color:#F59E0B">← Admin Panel</button>
+        </form>
+      <% } else { %>
+        <form action="/auth/logout" method="post" style="display:inline">
+          <button class="btn btn-ghost" type="submit">Sign out</button>
+        </form>
+      <% } %>
     </nav>
   </header>
 
