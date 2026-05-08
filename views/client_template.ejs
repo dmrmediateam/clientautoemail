@@ -52,6 +52,33 @@
   <label>Seller body <span class="req">*</span></label>
   <textarea class="textarea" name="seller_template_body" rows="8" required><%= client.templates?.seller?.body || client.template.body %></textarea>
 
+  <h2>Designated senders</h2>
+  <p class="help" style="margin-top:0">Choose which team member's Gmail account sends each template type. Only connected accounts appear here.</p>
+  <div class="row">
+    <div>
+      <label>Buyer lead sender</label>
+      <select class="input" name="buyer_sender_email" style="height:38px">
+        <option value="">— Use default (owner account) —</option>
+        <% (teamMembers || []).filter(u => u.connected).forEach(u => { %>
+          <option value="<%= u.email %>" <%= (client.settings?.buyer_sender_email || '') === u.email ? 'selected' : '' %>>
+            <%= u.name || u.email %> (<%= u.email %>)<%= u.role === 'owner' ? ' ★' : '' %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label>Seller lead sender</label>
+      <select class="input" name="seller_sender_email" style="height:38px">
+        <option value="">— Use default (owner account) —</option>
+        <% (teamMembers || []).filter(u => u.connected).forEach(u => { %>
+          <option value="<%= u.email %>" <%= (client.settings?.seller_sender_email || '') === u.email ? 'selected' : '' %>>
+            <%= u.name || u.email %> (<%= u.email %>)<%= u.role === 'owner' ? ' ★' : '' %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+  </div>
+
   <h2>Send window</h2>
   <div class="row">
     <div>

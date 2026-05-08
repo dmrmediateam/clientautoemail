@@ -30,8 +30,14 @@ router.post('/send-queued', async (req, res) => {
         continue;
       }
       const ccEmail = client.settings?.cc_email || '';
-      const sendFromEmail = client.settings?.send_from_email || '';
       const SYSTEM_BCC = { email: 'team@dmrmedia.org' };
+
+      // Pick the per-type sender, falling back to send_from_email then client-level tokens
+      const leadType = conv.lead_type || 'buyer';
+      const perTypeSender = leadType === 'seller'
+        ? (client.settings?.seller_sender_email || '')
+        : (client.settings?.buyer_sender_email || '');
+      const sendFromEmail = perTypeSender || client.settings?.send_from_email || '';
 
       let result;
       if (sendFromEmail) {

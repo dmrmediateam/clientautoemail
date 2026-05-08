@@ -164,6 +164,8 @@ async function update(id, patch) {
     timezone: patch.timezone ?? undefined,
     daily_send_limit: patch.daily_send_limit ?? undefined,
     cc_email: patch.cc_email ?? undefined,
+    buyer_sender_email: patch.buyer_sender_email ?? undefined,
+    seller_sender_email: patch.seller_sender_email ?? undefined,
   });
   return findById(id);
 }

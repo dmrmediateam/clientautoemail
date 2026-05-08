@@ -49,13 +49,17 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/template', (req, res) => {
-  res.render('client_template', {
-    brand: config.brand,
-    publicBaseUrl: config.publicBaseUrl,
-    client: req.client,
-    flash: flashFromQuery(req),
-  });
+router.get('/template', async (req, res, next) => {
+  try {
+    const teamMembers = await clientsRepo.listUsersForClient(req.client.id);
+    res.render('client_template', {
+      brand: config.brand,
+      publicBaseUrl: config.publicBaseUrl,
+      client: req.client,
+      teamMembers,
+      flash: flashFromQuery(req),
+    });
+  } catch (err) { next(err); }
 });
 
 router.post('/template', async (req, res, next) => {
@@ -74,6 +78,8 @@ router.post('/template', async (req, res, next) => {
       buyer_template_body: buyerBody,
       seller_template_subject: sellerSubject,
       seller_template_body: sellerBody,
+      buyer_sender_email: (req.body.buyer_sender_email || '').trim().toLowerCase(),
+      seller_sender_email: (req.body.seller_sender_email || '').trim().toLowerCase(),
       send_window_start: (req.body.send_window_start || req.client.settings?.send_window_start || '08:30').trim(),
       send_window_end: (req.body.send_window_end || req.client.settings?.send_window_end || '18:00').trim(),
       timezone: (req.body.timezone || req.client.settings?.timezone || 'America/Chicago').trim(),
