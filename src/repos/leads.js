@@ -83,15 +83,19 @@ async function recent(limit = 50) {
   return r.rows.map(rowOut);
 }
 
-async function counts() {
+async function counts(clientId) {
+  const where = clientId ? `WHERE direction = 'outbound' AND client_id = $1` : `WHERE direction = 'outbound'`;
+  const params = clientId ? [clientId] : [];
   const r = await query(
     `SELECT
        COUNT(*)::int AS total,
        COUNT(*) FILTER (WHERE status = 'sent')::int          AS sent,
        COUNT(*) FILTER (WHERE status = 'failed')::int        AS failed,
+       COUNT(*) FILTER (WHERE status = 'queued')::int        AS queued,
        COUNT(*) FILTER (WHERE status = 'rate_limited')::int  AS fallback
      FROM messages
-     WHERE direction = 'outbound'`
+     ${where}`,
+    params
   );
   return r.rows[0];
 }

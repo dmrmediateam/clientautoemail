@@ -1,89 +1,183 @@
-<% const title = 'Dashboard'; %>
+<% const title = 'Admin Overview'; %>
 <%- include('_header', { brand, page, flash, title }) %>
 
-<h1>Dashboard</h1>
-<p class="lede">Live view of webhook activity across all connected clients.</p>
+<style>
+  .admin-hero { margin-bottom: 28px; }
+  .admin-hero h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .admin-hero p { color: var(--fg-muted); font-size: 14px; margin: 0; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 32px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+  .stat-box .s-num { font-size: 30px; font-weight: 700; font-family: var(--mono); line-height: 1; }
+  .stat-box .s-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--fg-muted); margin-top: 6px; }
+  .stat-box.accent { border-color: var(--accent); }
+  .stat-box.accent .s-num { color: var(--accent); }
+  .stat-box.green .s-num { color: var(--success); }
+  .stat-box.red .s-num { color: var(--error); }
+  .stat-box.yellow .s-num { color: #D97706; }
 
-<div class="cards">
-  <div class="card"><div class="label">Total leads</div><div class="value"><%= stats.total || 0 %></div></div>
-  <div class="card"><div class="label">Sent</div><div class="value success"><%= stats.sent || 0 %></div></div>
-  <div class="card"><div class="label">Fallback</div><div class="value warning"><%= stats.fallback || 0 %></div></div>
-  <div class="card"><div class="label">Failed</div><div class="value error"><%= stats.failed || 0 %></div></div>
-</div>
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 14px; }
+  .section-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
 
-<h2>Clients</h2>
-<div class="panel">
-  <% if (clients.length === 0) { %>
-    <div class="empty">No clients yet. <a href="/admin/clients/new">Add your first client</a> to get started.</div>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr><th>Client</th><th>Agent</th><th>Gmail</th><th>Webhook URL</th><th>Status</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% clients.forEach(c => { %>
-          <tr>
-            <td>
-              <strong><%= c.name %></strong>
-              <% if (c.website) { %>
-                <div class="mono" style="color:var(--fg-muted);font-size:12px"><%= c.website %></div>
-              <% } %>
-            </td>
-            <td>
-              <%= c.agent_name %><br>
-              <span class="mono" style="color:var(--fg-muted);font-size:12px"><%= c.agent_email %></span>
-            </td>
-            <td>
-              <% if (c.google.connected) { %>
-                <span class="badge badge-on">Connected</span>
-              <% } else { %>
-                <span class="badge badge-warn">Not connected</span>
-              <% } %>
-            </td>
-            <td class="mono" style="font-size:12px;color:var(--fg-muted);max-width:280px;overflow-x:auto">
-              <%= publicBaseUrl %>/v1/webhooks/incoming/<%= c.id %>
-            </td>
-            <td>
-              <% if (c.active) { %><span class="badge badge-on">Active</span>
-              <% } else { %><span class="badge badge-off">Paused</span><% } %>
-            </td>
-            <td><a class="btn" href="/admin/clients/<%= c.id %>">Open</a></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
-</div>
+  .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .team-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; }
+  .team-card .tc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .team-card .tc-name { font-size: 16px; font-weight: 700; margin: 0 0 3px; }
+  .team-card .tc-sub { font-size: 12px; color: var(--fg-muted); }
+  .team-card .tc-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .team-card .tc-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .team-card .ts-item { background: var(--surface-2, #F4F5F7); border-radius: 6px; padding: 10px 12px; }
+  .team-card .ts-num { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+  .team-card .ts-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-muted); margin-top: 2px; }
+  .team-card .ts-item.green .ts-num { color: var(--success); }
+  .team-card .ts-item.red .ts-num { color: var(--error); }
+  .team-card .ts-item.blue .ts-num { color: var(--accent); }
+  .team-card .tc-actions { display: flex; gap: 8px; }
+  .team-card .tc-senders { font-size: 12px; color: var(--fg-muted); margin-bottom: 14px; line-height: 1.6; }
+  .team-card .tc-senders strong { color: var(--fg); }
 
-<h2>Recent activity</h2>
-<div class="panel">
-  <% if (recentLeads.length === 0) { %>
-    <div class="empty">No leads received yet. Webhooks will appear here.</div>
-  <% } else { %>
-    <table>
-      <thead><tr><th>When</th><th>Client</th><th>Lead</th><th>Status</th><th>Message ID</th></tr></thead>
-      <tbody>
-        <% recentLeads.forEach(l => { %>
-          <tr>
-            <td class="mono" style="font-size:12px"><%= new Date(l.created_at).toLocaleString() %></td>
-            <td><%= l.client_name || l.client_id %></td>
-            <td><%= l.email_to || '—' %></td>
-            <td><%- statusBadge(l.status) %></td>
-            <td class="mono" style="font-size:12px;color:var(--fg-muted)"><%= l.message_id || '—' %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
-</div>
+  .feed-table th, .feed-table td { font-size: 13px; }
+  .lead-email { font-weight: 500; }
+  .lead-type-buyer  { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #DBEAFE; color: #1D4ED8; }
+  .lead-type-seller { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #D1FAE5; color: #065F46; }
+  .lead-type-other  { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background: var(--surface-2, #F4F5F7); color: var(--fg-muted); }
+  .time-rel { font-size: 11px; color: var(--fg-muted); font-family: var(--mono); }
+</style>
 
 <%
+  function timeAgo(ms) {
+    const diff = Date.now() - ms;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.floor(h / 24) + 'd ago';
+  }
   const statusBadge = (s) => {
     if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
-    if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
+    if (s === 'queued') return '<span class="badge badge-warn">Queued</span>';
+    if (s === 'fallback' || s === 'rate_limited') return '<span class="badge badge-warn">Rate limited</span>';
     if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
     return '<span class="badge badge-off">' + s + '</span>';
   };
+  const activeTeams = clients.filter(c => c.active && c.google && c.google.connected).length;
 %>
+
+<div class="admin-hero">
+  <h1>Command Center</h1>
+  <p><%= activeTeams %> of <%= clients.length %> team<%= clients.length !== 1 ? 's' : '' %> live · all outbound email activity</p>
+</div>
+
+<div class="stat-row">
+  <div class="stat-box accent">
+    <div class="s-num"><%= stats.total || 0 %></div>
+    <div class="s-lbl">Total responses</div>
+  </div>
+  <div class="stat-box green">
+    <div class="s-num"><%= stats.sent || 0 %></div>
+    <div class="s-lbl">Successfully sent</div>
+  </div>
+  <div class="stat-box yellow">
+    <div class="s-num"><%= stats.queued || 0 %></div>
+    <div class="s-lbl">Queued</div>
+  </div>
+  <div class="stat-box red">
+    <div class="s-num"><%= stats.failed || 0 %></div>
+    <div class="s-lbl">Failed</div>
+  </div>
+  <div class="stat-box">
+    <div class="s-num"><%= activeTeams %></div>
+    <div class="s-lbl">Teams live</div>
+  </div>
+</div>
+
+<div class="section-head">
+  <h2>Active Teams</h2>
+  <a class="btn" href="/admin/clients/new">+ Add team</a>
+</div>
+<div class="team-grid">
+  <% clients.forEach(c => { %>
+    <%
+      const s = c._stats || {};
+      const hasBuyer = c.settings && c.settings.buyer_sender_email;
+      const hasSeller = c.settings && c.settings.seller_sender_email;
+    %>
+    <div class="team-card">
+      <div class="tc-top">
+        <div>
+          <div class="tc-name"><%= c.name %></div>
+          <div class="tc-sub"><%= c.agent_email %></div>
+        </div>
+        <% if (c.active && c.google && c.google.connected) { %>
+          <span class="badge badge-on">Live</span>
+        <% } else if (!c.active) { %>
+          <span class="badge badge-off">Paused</span>
+        <% } else { %>
+          <span class="badge badge-warn">No Gmail</span>
+        <% } %>
+      </div>
+
+      <div class="tc-senders">
+        <strong>Buyer sender:</strong> <%= (c.settings && c.settings.buyer_sender_email) || (c.google && c.google.email) || '—' %><br>
+        <strong>Seller sender:</strong> <%= (c.settings && c.settings.seller_sender_email) || (c.google && c.google.email) || '—' %>
+      </div>
+
+      <div class="tc-stats">
+        <div class="ts-item green">
+          <div class="ts-num"><%= s.sent || 0 %></div>
+          <div class="ts-lbl">Sent</div>
+        </div>
+        <div class="ts-item blue">
+          <div class="ts-num"><%= s.queued || 0 %></div>
+          <div class="ts-lbl">Queued</div>
+        </div>
+        <div class="ts-item red">
+          <div class="ts-num"><%= s.failed || 0 %></div>
+          <div class="ts-lbl">Failed</div>
+        </div>
+      </div>
+
+      <div class="tc-actions">
+        <form action="/admin/clients/<%= c.id %>/impersonate" method="post" style="flex:1">
+          <button class="btn" type="submit" style="width:100%;background:var(--accent);color:#fff;border-color:var(--accent)">Open Dashboard →</button>
+        </form>
+        <a class="btn btn-ghost" href="/admin/clients/<%= c.id %>" style="flex-shrink:0">Details</a>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<div class="section-head">
+  <h2>Recent leads &amp; responses</h2>
+  <a class="btn btn-ghost" href="/admin/leads">View all</a>
+</div>
+<div class="panel" style="padding:0">
+  <% if (recentLeads.length === 0) { %>
+    <div class="empty" style="padding:24px">No activity yet. Webhooks will appear here as leads come in.</div>
+  <% } else { %>
+    <table class="feed-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Team</th>
+          <th>Lead email</th>
+          <th>Subject</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% recentLeads.forEach(l => { %>
+          <tr>
+            <td class="time-rel"><%= timeAgo(l.created_at) %></td>
+            <td style="font-size:13px;font-weight:500"><%= l.client_name || '—' %></td>
+            <td class="lead-email"><%= l.email_to || '—' %></td>
+            <td style="font-size:12px;color:var(--fg-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= l.subject || '—' %></td>
+            <td><%- statusBadge(l.status) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
 
 <%- include('_footer') %>

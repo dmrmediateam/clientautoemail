@@ -5,6 +5,7 @@ const config = require('../config');
 const clientsRepo = require('../repos/clients');
 const leadsRepo = require('../repos/leads');
 const dispatcher = require('../services/dispatcher');
+const { issueClientSession, clearClientSession } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -25,11 +26,16 @@ router.get('/', async (req, res, next) => {
     const [clients, stats, recentLeads] = await Promise.all([
       clientsRepo.findAll(),
       leadsRepo.counts(),
-      leadsRepo.recent(15),
+      leadsRepo.recent(20),
     ]);
+    // Attach per-client stats
+    const clientStatsRows = await Promise.all(
+      clients.map(c => leadsRepo.counts(c.id).catch(() => ({})))
+    );
+    const clientsWithStats = clients.map((c, i) => ({ ...c, _stats: clientStatsRows[i] || {} }));
     res.render('dashboard', {
       page: 'dashboard',
-      clients,
+      clients: clientsWithStats,
       stats,
       recentLeads,
       flash: flashFromQuery(req),
@@ -164,6 +170,24 @@ router.get('/leads', async (req, res, next) => {
       publicBaseUrl: config.publicBaseUrl,
     });
   } catch (err) { next(err); }
+});
+
+// Impersonate a client — issues a client session and redirects to their dashboard
+router.post('/clients/:id/impersonate', async (req, res, next) => {
+  try {
+    const client = await clientsRepo.findById(req.params.id);
+    if (!client) return res.status(404).send('Client not found');
+    // Issue session using the client owner's email (or admin super email as proxy)
+    const ownerEmail = client.google.email || config.admin.superAdminEmail;
+    issueClientSession(res, client.id, ownerEmail);
+    res.redirect('/dashboard');
+  } catch (err) { next(err); }
+});
+
+// Stop impersonating — clears client session and returns to admin panel
+router.post('/stop-impersonating', (req, res) => {
+  clearClientSession(res);
+  res.redirect('/admin');
 });
 
 module.exports = router;
