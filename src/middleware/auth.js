@@ -94,6 +94,16 @@ async function requireClient(req, res, next) {
   if (!payload || payload.kind !== 'client' || !payload.cid) {
     return res.redirect('/onboarding?next=' + encodeURIComponent(req.originalUrl));
   }
+
+  // Super-admin should never land on the client dashboard — send them home
+  const superEmail = (config.admin.superAdminEmail || '').toLowerCase();
+  if (superEmail && payload.uid && payload.uid.toLowerCase() === superEmail) {
+    clearClientSession(res);
+    // Issue admin session in case they don't have one
+    issueAdminSession(res);
+    return res.redirect('/admin');
+  }
+
   try {
     const client = await clientsRepo.findById(payload.cid);
     if (!client) {
@@ -105,6 +115,10 @@ async function requireClient(req, res, next) {
     if (payload.uid) {
       req.currentUser = await clientsRepo.findUserByEmail(payload.uid) || null;
     }
+    // Detect admin impersonation — admin cookie is also present
+    const adminToken = req.cookies?.[ADMIN_COOKIE];
+    const adminPayload = verify(adminToken);
+    req.isAdminImpersonating = !!(adminPayload && adminPayload.kind === 'admin');
     next();
   } catch (err) {
     next(err);
