@@ -16,16 +16,31 @@ function splitName(full) {
 }
 
 function normalizeLeadType(payload) {
+  // 1. Explicit field from LP (most reliable when present)
   const raw = pick(payload, [
-    'lead_type',
-    'leadType',
-    'inquiry_type',
-    'inquiryType',
-    'type',
-    'contact_type',
+    'lead_type', 'leadType', 'inquiry_type', 'inquiryType', 'type', 'contact_type',
   ]).toLowerCase();
-  if (!raw) return 'buyer';
   if (raw.includes('seller') || raw.includes('listing') || raw.includes('sell')) return 'seller';
+  if (raw === 'buyer' || raw === 'buy' || raw === 'renter') return 'buyer';
+
+  // 2. Source URL pattern — LP includes page path lead came from
+  const sourceUrl = pick(payload, ['page_url', 'source_url', 'url', 'referrer', 'source']).toLowerCase();
+  const sellerUrls = ['/sell', '/home-value', '/home-valuation', '/list', '/listing-inquiry', '/sellers', '/what-is-my-home-worth'];
+  const buyerUrls  = ['/buy', '/listings', '/search', '/properties', '/buyers'];
+  if (sellerUrls.some(p => sourceUrl.includes(p))) return 'seller';
+  if (buyerUrls.some(p => sourceUrl.includes(p))) return 'buyer';
+
+  // 3. Keyword scan of the lead's message text
+  const msg = pick(payload, ['message', 'notes', 'inquiry', 'comments', 'body']).toLowerCase();
+  const sellerKeywords = [
+    'sell', 'selling', 'list my', 'listing my', 'put my home', 'put my house',
+    'market analysis', 'home worth', 'house worth', 'property worth', 'home value',
+    'house value', 'property value', 'valuation', 'what would my', 'cash offer',
+    'thinking of selling', 'want to sell', 'looking to sell', 'need to sell',
+  ];
+  if (sellerKeywords.some(kw => msg.includes(kw))) return 'seller';
+
+  // Default: buyer
   return 'buyer';
 }
 
