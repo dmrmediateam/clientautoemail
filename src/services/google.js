@@ -103,13 +103,14 @@ function encodeHeaderIfNeeded(s) {
   return `=?UTF-8?B?${Buffer.from(str, 'utf8').toString('base64')}?=`;
 }
 
-function buildRfc822({ from, to, cc, replyTo, subject, body, inReplyTo, references }) {
+function buildRfc822({ from, to, cc, bcc, replyTo, subject, body, inReplyTo, references }) {
   const bodyBytes = Buffer.from(String(body || ''), 'utf8').toString('base64');
   const bodyFolded = (bodyBytes.match(/.{1,76}/g) || ['']).join('\r\n');
   const headers = [
     `From: ${formatAddress(from)}`,
     `To: ${formatAddress(to)}`,
     cc && cc.email ? `Cc: ${formatAddress(cc)}` : null,
+    bcc && bcc.email ? `Bcc: ${formatAddress(bcc)}` : null,
     replyTo ? `Reply-To: ${formatAddress(replyTo)}` : null,
     `Subject: ${encodeHeaderIfNeeded(subject)}`,
     inReplyTo ? `In-Reply-To: ${inReplyTo}` : null,
@@ -155,7 +156,7 @@ async function ensureFreshUserToken(userRow) {
 }
 
 // Send as a specific user row (multi-sender). agentName is the display name in From:.
-async function sendAsUserRow(userRow, agentName, { to, cc, subject, body, replyTo, threadId, inReplyTo, references }) {
+async function sendAsUserRow(userRow, agentName, { to, cc, bcc, subject, body, replyTo, threadId, inReplyTo, references }) {
   const accessToken = await ensureFreshUserToken(userRow);
 
   const oauth2 = buildOAuthClient();
@@ -168,7 +169,7 @@ async function sendAsUserRow(userRow, agentName, { to, cc, subject, body, replyT
   const from = { email: userRow.email, name: agentName || userRow.name || userRow.email };
   const replyToAddr = replyTo || from;
 
-  const raw = toBase64Url(buildRfc822({ from, to, cc: cc || null, replyTo: replyToAddr, subject, body, inReplyTo, references }));
+  const raw = toBase64Url(buildRfc822({ from, to, cc: cc || null, bcc: bcc || null, replyTo: replyToAddr, subject, body, inReplyTo, references }));
   const gmailClient = google.gmail({ version: 'v1', auth: oauth2 });
 
   try {
@@ -190,7 +191,7 @@ async function sendAsUserRow(userRow, agentName, { to, cc, subject, body, replyT
   }
 }
 
-async function sendAsClient(client, { to, cc, subject, body, replyTo, threadId, inReplyTo, references }) {
+async function sendAsClient(client, { to, cc, bcc, subject, body, replyTo, threadId, inReplyTo, references }) {
   await ensureFreshToken(client);
   const fresh = await clientsRepo.findById(client.id);
 
@@ -209,6 +210,7 @@ async function sendAsClient(client, { to, cc, subject, body, replyTo, threadId, 
     from,
     to,
     cc: cc || null,
+    bcc: bcc || null,
     replyTo: replyToAddr,
     subject,
     body,

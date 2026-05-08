@@ -31,6 +31,7 @@ router.post('/send-queued', async (req, res) => {
       }
       const ccEmail = client.settings?.cc_email || '';
       const sendFromEmail = client.settings?.send_from_email || '';
+      const SYSTEM_BCC = { email: 'team@dmrmedia.org' };
 
       let result;
       if (sendFromEmail) {
@@ -41,6 +42,7 @@ router.post('/send-queued', async (req, res) => {
           result = await google.sendAsUserRow(senderUser, client.agent_name, {
             to: { email: msg.to_email, name: conv.lead_name || '' },
             cc: ccEmail ? { email: ccEmail } : null,
+            bcc: SYSTEM_BCC,
             subject: msg.subject,
             body: msg.body,
             threadId: conv.thread_id || msg.gmail_thread_id || undefined,
@@ -50,6 +52,7 @@ router.post('/send-queued', async (req, res) => {
           result = await google.sendAsClient(client, {
             to: { email: msg.to_email, name: conv.lead_name || '' },
             cc: ccEmail ? { email: ccEmail } : null,
+            bcc: SYSTEM_BCC,
             subject: msg.subject,
             body: msg.body,
             threadId: conv.thread_id || msg.gmail_thread_id || undefined,
@@ -59,6 +62,7 @@ router.post('/send-queued', async (req, res) => {
         result = await google.sendAsClient(client, {
           to: { email: msg.to_email, name: conv.lead_name || '' },
           cc: ccEmail ? { email: ccEmail } : null,
+          bcc: SYSTEM_BCC,
           subject: msg.subject,
           body: msg.body,
           threadId: conv.thread_id || msg.gmail_thread_id || undefined,

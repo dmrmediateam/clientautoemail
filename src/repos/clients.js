@@ -310,6 +310,19 @@ function defaultTemplateBody() {
   ].join('\n');
 }
 
+function defaultSellerTemplateBody() {
+  return [
+    'Hi {{first_name}},',
+    '',
+    'Thanks for reaching out about your home at {{property_address}}. I\'d love to learn more about your goals and put together a complimentary market analysis so you can see exactly what your property is worth right now.',
+    '',
+    'Would you have 15 minutes for a quick call this week? I can work around your schedule.',
+    '',
+    '{{agent_name}}',
+    '{{agent_phone}}',
+  ].join('\n');
+}
+
 module.exports = {
   findById,
   findByGoogleEmail,
@@ -325,5 +338,6 @@ module.exports = {
   clearGoogleTokens,
   remove,
   defaultTemplateBody,
+  defaultSellerTemplateBody,
   upsertSettings: clientSettingsRepo.upsert,
 };
