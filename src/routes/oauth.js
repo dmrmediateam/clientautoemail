@@ -63,31 +63,62 @@ router.get('/google/callback', async (req, res) => {
     return res.status(400).send('Google did not return an email — make sure userinfo.email scope is granted.');
   }
 
-  let client = await clientsRepo.findByGoogleEmail(tokens.email);
+  const email = tokens.email.toLowerCase();
+  let client;
 
-  if (!client) {
-    if (!tokens.refresh_token) {
-      return res.status(400).send(
-        'Google did not return a refresh_token. Visit https://myaccount.google.com/permissions, ' +
-        'remove access for "DMR Media Lead Bridge", and try connecting again.'
-      );
+  // 1. Look up in users table first (multi-user SaaS)
+  const userRow = await clientsRepo.findUserByEmail(email);
+  if (userRow) {
+    client = await clientsRepo.findById(userRow.client_id);
+    if (!client) return res.status(400).send('Account not found. Contact support at team@dmrmedia.org.');
+
+    if (userRow.role === 'owner') {
+      // Owner connects their Gmail — save tokens for sending
+      if (!tokens.refresh_token && !client.google.refresh_token) {
+        return res.status(400).send(
+          'Google did not return a refresh_token. Visit https://myaccount.google.com/permissions, ' +
+          'remove access for "DMR Lead Responder", and try connecting again.'
+        );
+      }
+      await clientsRepo.saveGoogleTokens(client.id, tokens);
     }
-    const fallbackName = tokens.name || tokens.email.split('@')[0];
-    client = await clientsRepo.create({
-      name: fallbackName,
-      website: '',
-      agent_name: fallbackName,
-      agent_email: tokens.email,
-      agent_phone: '',
-    });
-  } else if (!tokens.refresh_token && !client.google.refresh_token) {
-    return res.status(400).send(
-      'Google did not return a refresh_token. Visit https://myaccount.google.com/permissions, ' +
-      'remove access for "DMR Media Lead Bridge", and try connecting again.'
-    );
+    // All users (owner or member): save tokens to their own users row
+    await clientsRepo.saveUserGoogleTokens(email, tokens);
+  } else {
+    // 2. Legacy fallback: look up by google_email / agent_email on clients row
+    client = await clientsRepo.findByGoogleEmail(email);
+    if (client) {
+      // Existing client not yet in users table — auto-create owner row
+      await clientsRepo.upsertUser({ email, name: tokens.name, clientId: client.id, role: 'owner' });
+      if (!tokens.refresh_token && !client.google.refresh_token) {
+        return res.status(400).send(
+          'Google did not return a refresh_token. Visit https://myaccount.google.com/permissions, ' +
+          'remove access for "DMR Lead Responder", and try connecting again.'
+        );
+      }
+      await clientsRepo.saveGoogleTokens(client.id, tokens);
+      await clientsRepo.saveUserGoogleTokens(email, tokens);
+    } else {
+      // 3. Brand-new client — create account + owner user
+      if (!tokens.refresh_token) {
+        return res.status(400).send(
+          'Google did not return a refresh_token. Visit https://myaccount.google.com/permissions, ' +
+          'remove access for "DMR Lead Responder", and try connecting again.'
+        );
+      }
+      const fallbackName = tokens.name || email.split('@')[0];
+      client = await clientsRepo.create({
+        name: fallbackName,
+        website: '',
+        agent_name: fallbackName,
+        agent_email: email,
+        agent_phone: '',
+      });
+      await clientsRepo.upsertUser({ email, name: fallbackName, clientId: client.id, role: 'owner' });
+      await clientsRepo.saveGoogleTokens(client.id, tokens);
+      await clientsRepo.saveUserGoogleTokens(email, tokens);
+    }
   }
-
-  await clientsRepo.saveGoogleTokens(client.id, tokens);
   try {
     await google.watchMailbox(
       await clientsRepo.findById(client.id),

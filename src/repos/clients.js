@@ -44,6 +44,7 @@ function rowToClient(row, settings) {
       seller_template_subject: effectiveSettings.seller_template_subject || buyerSubject,
       seller_template_body: effectiveSettings.seller_template_body || buyerBody,
       cc_email: effectiveSettings.cc_email || '',
+      send_from_email: effectiveSettings.send_from_email || '',
     },
     google: {
       access_token: row.google_access_token_encrypted ? enc.decrypt(row.google_access_token_encrypted) : null,
@@ -212,6 +213,90 @@ async function remove(id) {
   return r.rowCount > 0;
 }
 
+// --- Users (multi-user per client account) ---
+
+async function findUserByEmail(email) {
+  if (!email) return null;
+  const r = await query(
+    'SELECT * FROM users WHERE email = LOWER($1) LIMIT 1',
+    [email]
+  );
+  return r.rows[0] || null;
+}
+
+async function upsertUser({ email, name, clientId, role }) {
+  const t = now();
+  const r = await query(
+    `INSERT INTO users (id, email, name, client_id, role, created_at, updated_at)
+     VALUES (gen_random_uuid()::text, LOWER($1), $2, $3, $4, $5, $5)
+     ON CONFLICT (email)
+     DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name), updated_at = $5
+     RETURNING *`,
+    [email, name || null, clientId, role || 'member', t]
+  );
+  return r.rows[0];
+}
+
+// Save Google tokens to a user row (for multi-sender support)
+async function saveUserGoogleTokens(email, tokens) {
+  const t = now();
+  await query(
+    `UPDATE users SET
+       google_access_token_encrypted  = $2,
+       google_refresh_token_encrypted = COALESCE($3, google_refresh_token_encrypted),
+       google_token_expiry            = $4,
+       google_scope                   = $5,
+       google_connected               = TRUE,
+       updated_at                     = $6
+     WHERE email = LOWER($1)`,
+    [
+      email,
+      tokens.access_token ? enc.encrypt(tokens.access_token) : null,
+      tokens.refresh_token ? enc.encrypt(tokens.refresh_token) : null,
+      tokens.expiry || null,
+      tokens.scope || null,
+      t,
+    ]
+  );
+}
+
+async function clearUserGoogleTokens(email) {
+  const t = now();
+  await query(
+    `UPDATE users SET
+       google_access_token_encrypted  = NULL,
+       google_refresh_token_encrypted = NULL,
+       google_token_expiry            = NULL,
+       google_scope                   = NULL,
+       google_connected               = FALSE,
+       updated_at                     = $2
+     WHERE email = LOWER($1)`,
+    [email, t]
+  );
+}
+
+// Returns all users for a client with their connection status
+async function listUsersForClient(clientId) {
+  const r = await query(
+    `SELECT id, email, name, role, google_connected,
+            google_access_token_encrypted, google_refresh_token_encrypted,
+            google_token_expiry, google_scope
+     FROM users WHERE client_id = $1 ORDER BY role DESC, created_at ASC`,
+    [clientId]
+  );
+  return r.rows.map(u => ({
+    id: u.id,
+    email: u.email,
+    name: u.name || u.email,
+    role: u.role,
+    connected: !!u.google_connected,
+    access_token: u.google_access_token_encrypted ? enc.decrypt(u.google_access_token_encrypted) : null,
+    refresh_token: u.google_refresh_token_encrypted ? enc.decrypt(u.google_refresh_token_encrypted) : null,
+    expiry: u.google_token_expiry ? Number(u.google_token_expiry) : 0,
+    scope: u.google_scope || '',
+  }));
+}
+
 function defaultTemplateBody() {
   return [
     'Hi {{first_name}},',
@@ -228,6 +313,11 @@ function defaultTemplateBody() {
 module.exports = {
   findById,
   findByGoogleEmail,
+  findUserByEmail,
+  upsertUser,
+  saveUserGoogleTokens,
+  clearUserGoogleTokens,
+  listUsersForClient,
   findAll,
   create,
   update,

@@ -273,6 +273,7 @@ module.exports = {
   exchangeCode,
   ensureFreshToken,
   sendAsClient,
+  sendAsUserRow,
   listInboundMessages,
   watchMailbox,
   buildRfc822,

@@ -86,6 +86,21 @@ CREATE TABLE IF NOT EXISTS leads (
   created_at          BIGINT NOT NULL
 );
 
+-- Multi-user: maps individual Google accounts to a client account.
+-- role = 'owner'  → connects Gmail for sending, sees dashboard
+-- role = 'member' → dashboard access only, does not overwrite sending credentials
+CREATE TABLE IF NOT EXISTS users (
+  id           TEXT PRIMARY KEY,
+  email        TEXT UNIQUE NOT NULL,   -- stored lowercase
+  name         TEXT,
+  client_id    TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  role         TEXT NOT NULL DEFAULT 'member',
+  created_at   BIGINT NOT NULL,
+  updated_at   BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_client_id ON users(client_id);
+
 CREATE INDEX IF NOT EXISTS idx_leads_client_id ON leads(client_id);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
