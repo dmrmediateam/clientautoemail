@@ -38,7 +38,7 @@
   .checklist li { display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
   .checklist li:last-child { border-bottom:0; }
   .check-icon { width:22px; height:22px; border-radius:50%; flex-shrink:0; margin-top:1px; display:grid; place-items:center; font-size:11px; }
-  .check-done { background:rgba(74,222,128,.15); color:var(--success); border:1px solid rgba(74,222,128,.3); }
+  .check-done { background:#DCFCE7; color:var(--success); border:1px solid #BBF7D0; }
   .check-todo { background:var(--surface-2); color:var(--fg-muted); border:1px solid var(--border); }
   .check-label strong { display:block; font-size:14px; margin-bottom:2px; }
   .check-label span   { font-size:12px; color:var(--fg-muted); }
@@ -61,7 +61,7 @@
   /* Messages tab */
   .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin:-20px -20px 20px; padding:0 20px; }
   .tab-bar button { background:none; border:none; padding:12px 16px; font-size:13px; color:var(--fg-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
-  .tab-bar button.active { color:var(--fg); border-bottom-color:var(--accent); }
+  .tab-bar button.active { color:var(--accent); border-bottom-color:var(--accent); }
   .tab-content { display:none; }
   .tab-content.active { display:block; }
   .msg-row { display:grid; grid-template-columns:1fr auto auto; gap:8px 16px; padding:12px 0; border-bottom:1px solid var(--border); align-items:center; }
@@ -88,7 +88,7 @@
         <% var _me = currentUser ? currentUser.email : (client.google.email || client.agent_email); %>
         <%= _me %>
         <span style="margin-left:4px;opacity:.5">·</span>
-        <span style="color:var(--accent)"><%= client.name %></span>
+        <span style="color:var(--accent);font-weight:600"><%= client.name %></span>
       </span>
       <form action="/auth/logout" method="post" style="display:inline">
         <button class="btn btn-ghost" type="submit">Sign out</button>
