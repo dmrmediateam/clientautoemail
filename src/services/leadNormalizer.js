@@ -29,7 +29,15 @@ function flattenLPPayload(raw) {
       d.activityListingState || '',
       d.activityListingZip || '',
     ].map(s => String(s).trim()).filter(Boolean);
-    const builtAddress = addrParts.length ? addrParts.join(', ') : '';
+    let builtAddress = addrParts.length ? addrParts.join(', ') : '';
+
+    // For HOME_VALUE leads, LP puts the property address inside activityMessage
+    // e.g. "User entered address:\n123 Main St\nGeocoded address:\n123 Main St, City, ST 12345, USA"
+    if (!builtAddress && d.activityMessage) {
+      const geoMatch = d.activityMessage.match(/Geocoded address:\s*\n?(.+?)(?:\n|$)/i);
+      const userMatch = d.activityMessage.match(/User entered address:\s*\n?(.+?)(?:\n|$)/i);
+      builtAddress = (geoMatch && geoMatch[1].trim()) || (userMatch && userMatch[1].trim()) || '';
+    }
 
     // LP lead tags array — check for explicit Seller tag
     const tags = Array.isArray(d.leadTags) ? d.leadTags.map(t => String(t.value || '').toLowerCase()) : [];
@@ -76,8 +84,8 @@ function normalizeLeadType(payload) {
 
   // 3. Source URL pattern
   const sourceUrl = pick(payload, ['source_url', 'page_url', 'source_url', 'url', 'referrer', 'source']).toLowerCase();
-  const sellerUrls = ['/sell', '/home-value', '/home-valuation', '/list', '/listing-inquiry', '/sellers', '/what-is-my-home-worth'];
-  const buyerUrls  = ['/buy', '/listings', '/search', '/properties', '/buyers'];
+  const sellerUrls = ['/sell', '/home-value', '/home-valuation', '/listing-inquiry', '/sellers', '/what-is-my-home-worth', '/list-my', '/list-your'];
+  const buyerUrls  = ['/buy', '/listings', '/home-search', '/search', '/properties', '/buyers'];
   if (sellerUrls.some(p => sourceUrl.includes(p))) return 'seller';
   if (buyerUrls.some(p => sourceUrl.includes(p))) return 'buyer';
 
