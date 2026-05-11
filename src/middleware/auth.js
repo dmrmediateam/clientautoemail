@@ -79,8 +79,10 @@ function checkAdminCredentials(username, password) {
 
 // --- Client session ---
 
-function issueClientSession(res, clientId, userEmail) {
-  const token = sign({ kind: 'client', cid: clientId, uid: userEmail || '', exp: Date.now() + CLIENT_MAX_AGE_MS });
+function issueClientSession(res, clientId, userEmail, opts = {}) {
+  const payload = { kind: 'client', cid: clientId, uid: userEmail || '', exp: Date.now() + CLIENT_MAX_AGE_MS };
+  if (opts.impersonating) payload.imp = true;
+  const token = sign(payload);
   res.cookie(CLIENT_COOKIE, token, cookieOptions(CLIENT_MAX_AGE_MS));
 }
 
@@ -95,13 +97,15 @@ async function requireClient(req, res, next) {
     return res.redirect('/onboarding?next=' + encodeURIComponent(req.originalUrl));
   }
 
-  // Super-admin should never land on the client dashboard — send them home
-  const superEmail = (config.admin.superAdminEmail || '').toLowerCase();
-  if (superEmail && payload.uid && payload.uid.toLowerCase() === superEmail) {
-    clearClientSession(res);
-    // Issue admin session in case they don't have one
-    issueAdminSession(res);
-    return res.redirect('/admin');
+  // Super-admin should never land on the client dashboard unless they are
+  // explicitly impersonating (payload.imp = true set by the admin impersonate route)
+  if (!payload.imp) {
+    const superEmail = (config.admin.superAdminEmail || '').toLowerCase();
+    if (superEmail && payload.uid && payload.uid.toLowerCase() === superEmail) {
+      clearClientSession(res);
+      issueAdminSession(res);
+      return res.redirect('/admin');
+    }
   }
 
   try {
@@ -112,13 +116,13 @@ async function requireClient(req, res, next) {
     }
     req.client = client;
     // Attach the logged-in user row if email is stored in the session
-    if (payload.uid) {
+    if (payload.uid && !payload.imp) {
       req.currentUser = await clientsRepo.findUserByEmail(payload.uid) || null;
     }
-    // Detect admin impersonation — admin cookie is also present
+    // Detect admin impersonation — explicit imp flag OR admin cookie present
     const adminToken = req.cookies?.[ADMIN_COOKIE];
     const adminPayload = verify(adminToken);
-    req.isAdminImpersonating = !!(adminPayload && adminPayload.kind === 'admin');
+    req.isAdminImpersonating = !!(payload.imp || (adminPayload && adminPayload.kind === 'admin'));
     next();
   } catch (err) {
     next(err);

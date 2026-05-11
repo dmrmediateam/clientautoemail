@@ -231,8 +231,7 @@ router.get('/conversations/:id', async (req, res, next) => {
     if (!conversation) return res.status(404).send('Conversation not found');
     const client = await clientsRepo.findById(conversation.client_id);
     if (!client) return res.status(404).send('Client not found');
-    const ownerEmail = client.google.email || config.admin.superAdminEmail;
-    issueClientSession(res, client.id, ownerEmail);
+    issueClientSession(res, client.id, client.agent_email, { impersonating: true });
     res.redirect(`/dashboard/conversations/${conversation.id}`);
   } catch (err) { next(err); }
 });
@@ -269,9 +268,7 @@ router.post('/clients/:id/impersonate', async (req, res, next) => {
   try {
     const client = await clientsRepo.findById(req.params.id);
     if (!client) return res.status(404).send('Client not found');
-    // Issue session using the client owner's email (or admin super email as proxy)
-    const ownerEmail = client.google.email || config.admin.superAdminEmail;
-    issueClientSession(res, client.id, ownerEmail);
+    issueClientSession(res, client.id, client.agent_email, { impersonating: true });
     const redirect = req.query.redirect || req.body.redirect || '/dashboard';
     // Only allow relative redirects to prevent open redirect
     const safePath = redirect.startsWith('/') ? redirect : '/dashboard';
