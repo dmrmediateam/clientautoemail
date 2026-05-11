@@ -31,9 +31,13 @@
   .team-card .ts-item.green .ts-num { color: var(--success); }
   .team-card .ts-item.red .ts-num { color: var(--error); }
   .team-card .ts-item.blue .ts-num { color: var(--accent); }
-  .team-card .tc-actions { display: flex; gap: 8px; }
+  .team-card .tc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .team-card .tc-senders { font-size: 12px; color: var(--fg-muted); margin-bottom: 14px; line-height: 1.6; }
   .team-card .tc-senders strong { color: var(--fg); }
+  .team-card .tc-meta { display: flex; gap: 12px; font-size: 11px; color: var(--fg-muted); margin-bottom: 12px; align-items: center; }
+  .team-card .tc-meta .tc-pill { background: var(--surface-2, #F4F5F7); border-radius: 20px; padding: 2px 9px; }
+  .btn-replies { background: #111827; color: #fff; border-color: #111827; }
+  .btn-replies:hover { background: #374151; border-color: #374151; }
 
   .feed-table th, .feed-table td { font-size: 13px; }
   .lead-email { font-weight: 500; }
@@ -92,15 +96,14 @@
 </div>
 
 <div class="section-head">
-  <h2>Active Teams</h2>
+  <h2>All Teams (<%= clients.length %>)</h2>
   <a class="btn" href="/admin/clients/new">+ Add team</a>
 </div>
 <div class="team-grid">
   <% clients.forEach(c => { %>
     <%
       const s = c._stats || {};
-      const hasBuyer = c.settings && c.settings.buyer_sender_email;
-      const hasSeller = c.settings && c.settings.seller_sender_email;
+      const memberCount = c._memberCount || 0;
     %>
     <div class="team-card">
       <div class="tc-top">
@@ -117,9 +120,16 @@
         <% } %>
       </div>
 
+      <div class="tc-meta">
+        <span class="tc-pill"><%= memberCount %> member<%= memberCount !== 1 ? 's' : '' %></span>
+        <span class="tc-pill">limit <%= (c.settings && c.settings.daily_send_limit) || 5 %>/day</span>
+        <span class="tc-pill"><%= (c.settings && c.settings.timezone) || 'America/Chicago' %></span>
+      </div>
+
       <div class="tc-senders">
         <strong>Buyer sender:</strong> <%= (c.settings && c.settings.buyer_sender_email) || (c.google && c.google.email) || '—' %><br>
-        <strong>Seller sender:</strong> <%= (c.settings && c.settings.seller_sender_email) || (c.google && c.google.email) || '—' %>
+        <strong>Seller sender:</strong> <%= (c.settings && c.settings.seller_sender_email) || (c.google && c.google.email) || '—' %><br>
+        <% if (c.settings && c.settings.cc_email) { %><strong>CC:</strong> <%= c.settings.cc_email %><% } %>
       </div>
 
       <div class="tc-stats">
@@ -139,9 +149,24 @@
 
       <div class="tc-actions">
         <form action="/admin/clients/<%= c.id %>/impersonate" method="post" style="flex:1">
-          <button class="btn" type="submit" style="width:100%;background:var(--accent);color:#fff;border-color:var(--accent)">Open Dashboard →</button>
+          <input type="hidden" name="redirect" value="/dashboard/template" />
+          <button class="btn btn-replies" type="submit" style="width:100%">Edit Replies →</button>
         </form>
-        <a class="btn btn-ghost" href="/admin/clients/<%= c.id %>" style="flex-shrink:0">Details</a>
+        <form action="/admin/clients/<%= c.id %>/impersonate" method="post" style="flex:1">
+          <button class="btn" type="submit" style="width:100%;background:var(--accent);color:#fff;border-color:var(--accent)">Dashboard →</button>
+        </form>
+      </div>
+      <div class="tc-actions" style="margin-top:8px">
+        <a class="btn btn-ghost" href="/admin/clients/<%= c.id %>" style="flex:1;text-align:center">Details</a>
+        <% if (c.active) { %>
+          <form action="/admin/clients/<%= c.id %>/toggle-active" method="post" style="flex:1">
+            <button class="btn" type="submit" style="width:100%;color:#B45309;border-color:#B45309">⏸ Pause</button>
+          </form>
+        <% } else { %>
+          <form action="/admin/clients/<%= c.id %>/toggle-active" method="post" style="flex:1">
+            <button class="btn" type="submit" style="width:100%;color:var(--success);border-color:var(--success)">▶ Resume</button>
+          </form>
+        <% } %>
       </div>
     </div>
   <% }) %>
@@ -149,7 +174,7 @@
 
 <div class="section-head">
   <h2>Recent leads &amp; responses</h2>
-  <a class="btn btn-ghost" href="/admin/leads">View all</a>
+  <a class="btn btn-ghost" href="/admin/leads">View CRM</a>
 </div>
 <div class="panel" style="padding:0">
   <% if (recentLeads.length === 0) { %>
@@ -160,7 +185,8 @@
         <tr>
           <th>Time</th>
           <th>Team</th>
-          <th>Lead email</th>
+          <th>Lead</th>
+          <th>Type</th>
           <th>Subject</th>
           <th>Status</th>
         </tr>
@@ -170,7 +196,12 @@
           <tr>
             <td class="time-rel"><%= timeAgo(l.created_at) %></td>
             <td style="font-size:13px;font-weight:500"><%= l.client_name || '—' %></td>
-            <td class="lead-email"><%= l.email_to || '—' %></td>
+            <td class="lead-email"><%= l.lead_name || l.email_to || l.lead_email || '—' %></td>
+            <td>
+              <% if (l.lead_type === 'seller') { %><span class="lead-type-seller">seller</span>
+              <% } else if (l.lead_type === 'buyer') { %><span class="lead-type-buyer">buyer</span>
+              <% } else { %><span class="lead-type-other"><%= l.lead_type || '—' %></span><% } %>
+            </td>
             <td style="font-size:12px;color:var(--fg-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= l.subject || '—' %></td>
             <td><%- statusBadge(l.status) %></td>
           </tr>

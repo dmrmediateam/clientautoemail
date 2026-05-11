@@ -97,8 +97,11 @@
       <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
     <% } %>
 
-    <div style="margin-bottom:16px">
+    <div style="margin-bottom:16px;display:flex;gap:16px;align-items:center">
       <a href="/dashboard" style="font-size:13px;color:var(--fg-muted);text-decoration:none">&#8592; Back to dashboard</a>
+      <% if (typeof isAdminImpersonating !== 'undefined' && isAdminImpersonating) { %>
+        <a href="/admin/leads" style="font-size:13px;color:var(--fg-muted);text-decoration:none">&#8592; Back to CRM</a>
+      <% } %>
     </div>
 
     <div class="conv-layout">

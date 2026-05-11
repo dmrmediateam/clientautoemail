@@ -1,6 +1,9 @@
 <%
   const action = isNew ? '/admin/clients' : ('/admin/clients/' + client.id);
   const title = isNew ? 'New client' : ('Edit ' + client.name);
+  const s = client.settings || {};
+  const tmpl = client.templates || {};
+  const tm = (typeof teamMembers !== 'undefined' ? teamMembers : []);
 %>
 <%- include('_header', { brand, page, flash, title }) %>
 
@@ -42,20 +45,95 @@
   <input class="input" name="agent_phone" value="<%= client.agent_phone %>" placeholder="(555) 123-4567" />
 
   <h2>Email template</h2>
-  <label>Subject <span class="req">*</span></label>
-  <input class="input" name="template_subject" required value="<%= client.template.subject %>" />
-  <label>Body <span class="req">*</span></label>
-  <textarea class="textarea" name="template_body" rows="12" required><%= client.template.body %></textarea>
-  <p class="help">Plain text only. Placeholders: <span class="mono">{{first_name}} {{full_name}} {{email}} {{phone}} {{property_address}} {{property_url}} {{message}} {{agent_name}} {{agent_phone}}</span></p>
+  <p class="help" style="margin-top:0">Separate buyer and seller templates. Placeholders: <span class="mono">{{first_name}} {{full_name}} {{email}} {{phone}} {{property_address}} {{property_url}} {{message}} {{agent_name}} {{agent_phone}}</span></p>
 
-  <h2>Delivery (optional)</h2>
-  <label>CC email (always copied on every outbound email)</label>
-  <input class="input" type="email" name="cc_email" value="<%= client.settings?.cc_email || '' %>" placeholder="partner@example.com" />
-  <p class="help">Leave blank for none. Use this to CC a second agent on all leads for this client.</p>
+  <h3 style="margin:14px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Buyer leads</h3>
+  <label>Buyer subject <span class="req">*</span></label>
+  <input class="input" name="buyer_template_subject" required value="<%= tmpl.buyer?.subject || client.template?.subject || s.buyer_template_subject || '' %>" />
+  <label>Buyer body <span class="req">*</span></label>
+  <textarea class="textarea" name="buyer_template_body" rows="8" required><%= tmpl.buyer?.body || client.template?.body || s.buyer_template_body || '' %></textarea>
 
-  <label>SendGrid API key (per-client override)</label>
+  <h3 style="margin:14px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Seller leads</h3>
+  <label>Seller subject <span class="req">*</span></label>
+  <input class="input" name="seller_template_subject" required value="<%= tmpl.seller?.subject || s.seller_template_subject || '' %>" />
+  <label>Seller body <span class="req">*</span></label>
+  <textarea class="textarea" name="seller_template_body" rows="8" required><%= tmpl.seller?.body || s.seller_template_body || '' %></textarea>
+
+  <h2>Delivery</h2>
+  <label>CC email <span style="font-size:11px">(always copied on every outbound email)</span></label>
+  <input class="input" type="email" name="cc_email" value="<%= s.cc_email || '' %>" placeholder="partner@example.com" />
+  <p class="help">Leave blank for none. Copies a second agent or inbox on all outbound emails for this client.</p>
+
+  <label>SendGrid API key <span style="font-size:11px">(per-client override)</span></label>
   <input class="input" name="sendgrid_api_key" value="<%= client.sendgrid_api_key || '' %>" placeholder="leave blank to use master key" />
-  <p class="help">If blank, the system master key is used. Per-client keys are stored encrypted (AES-256-GCM).</p>
+  <p class="help">If blank, the system master key is used. Stored encrypted (AES-256-GCM).</p>
+
+  <h2>Campaign settings</h2>
+  <div class="row">
+    <div>
+      <label>Send window start <span style="font-size:11px">(HH:MM, 24h)</span></label>
+      <input class="input" name="send_window_start" value="<%= s.send_window_start || '08:30' %>" placeholder="08:30" />
+    </div>
+    <div>
+      <label>Send window end <span style="font-size:11px">(HH:MM, 24h)</span></label>
+      <input class="input" name="send_window_end" value="<%= s.send_window_end || '18:00' %>" placeholder="18:00" />
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>Timezone <span style="font-size:11px">(IANA)</span></label>
+      <input class="input" name="timezone" value="<%= s.timezone || 'America/Chicago' %>" placeholder="America/Chicago" />
+    </div>
+    <div>
+      <label>Daily send cap</label>
+      <input class="input" type="number" min="1" max="250" name="daily_send_limit" value="<%= s.daily_send_limit || 5 %>" />
+    </div>
+  </div>
+
+  <h2>Designated senders</h2>
+  <p class="help" style="margin-top:0">Which team account's Gmail sends replies for each lead type. Must be a connected team member email.</p>
+  <div class="row">
+    <div>
+      <label>Buyer lead sender</label>
+      <% if (tm.filter(u => u.connected).length > 0) { %>
+        <select class="input" name="buyer_sender_email" style="height:38px">
+          <option value="">— Use owner account —</option>
+          <% tm.filter(u => u.connected).forEach(u => { %>
+            <option value="<%= u.email %>" <%= (s.buyer_sender_email || '') === u.email ? 'selected' : '' %>>
+              <%= u.name || u.email %><%= u.role === 'owner' ? ' ★' : '' %>
+            </option>
+          <% }) %>
+        </select>
+      <% } else { %>
+        <input class="input" name="buyer_sender_email" value="<%= s.buyer_sender_email || '' %>" placeholder="email@example.com or leave blank" />
+        <p class="help">No connected team members yet. Enter email manually once they connect Gmail.</p>
+      <% } %>
+    </div>
+    <div>
+      <label>Seller lead sender</label>
+      <% if (tm.filter(u => u.connected).length > 0) { %>
+        <select class="input" name="seller_sender_email" style="height:38px">
+          <option value="">— Use owner account —</option>
+          <% tm.filter(u => u.connected).forEach(u => { %>
+            <option value="<%= u.email %>" <%= (s.seller_sender_email || '') === u.email ? 'selected' : '' %>>
+              <%= u.name || u.email %><%= u.role === 'owner' ? ' ★' : '' %>
+            </option>
+          <% }) %>
+        </select>
+      <% } else { %>
+        <input class="input" name="seller_sender_email" value="<%= s.seller_sender_email || '' %>" placeholder="email@example.com or leave blank" />
+      <% } %>
+    </div>
+  </div>
+
+  <label>Fallback send-from email <span style="font-size:11px">(overrides owner account if set)</span></label>
+  <input class="input" name="send_from_email" value="<%= s.send_from_email || '' %>" placeholder="leave blank to use Gmail-connected owner" />
+  <p class="help">Only needed if no per-type sender is set. Must be a connected team member.</p>
+
+  <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:12px">
+    <input type="checkbox" name="team_signature_enabled" style="width:16px;height:16px" <%= s.team_signature_enabled ? 'checked' : '' %> />
+    <span>Append "<%= client.name || 'Team Name' %> Team" to every outgoing email</span>
+  </label>
 
   <% if (!isNew) { %>
     <h2>Status</h2>

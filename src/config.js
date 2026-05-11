@@ -31,6 +31,7 @@ const config = {
     password: optional('ADMIN_PASSWORD', ''),
     sessionSecret: optional('SESSION_SECRET', ''),
     alertEmail: optional('ADMIN_ALERT_EMAIL', ''),
+    superAdminEmail: optional('ADMIN_SUPER_EMAIL', 'team@dmrmedia.org'),
   },
 
   encryptionKey: optional('ENCRYPTION_KEY', ''),

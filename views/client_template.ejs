@@ -93,6 +93,11 @@
   </label>
   <p class="help" style="margin-top:6px">When checked, the line "<%= client.name %> Team" is added below the agent's name and phone in every email.</p>
 
+  <h2>Delivery</h2>
+  <label>CC email <span style="font-size:11px">(copied on every outbound email)</span></label>
+  <input class="input" type="email" name="cc_email" value="<%= client.settings?.cc_email || '' %>" placeholder="partner@brokerage.com or leave blank" />
+  <p class="help">A second inbox that receives a copy of every automated reply. Leave blank for none.</p>
+
   <h2>Send window</h2>
   <div class="row">
     <div>

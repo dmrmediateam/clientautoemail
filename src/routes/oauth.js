@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const google = require('../services/google');
 const clientsRepo = require('../repos/clients');
 const config = require('../config');
-const { issueClientSession, clearClientSession } = require('../middleware/auth');
+const { issueClientSession, clearClientSession, issueAdminSession } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -65,6 +65,12 @@ router.get('/google/callback', async (req, res) => {
 
   const email = tokens.email.toLowerCase();
   let client;
+
+  // 0. Super-admin: issue admin session and skip client setup entirely
+  if (config.admin.superAdminEmail && email === config.admin.superAdminEmail.toLowerCase()) {
+    issueAdminSession(res);
+    return res.redirect('/admin?connected=1');
+  }
 
   // 1. Look up in users table first (multi-user SaaS)
   const userRow = await clientsRepo.findUserByEmail(email);

@@ -73,9 +73,11 @@ async function recent(limit = 50) {
   const r = await query(
     `SELECT m.id, m.client_id, m.to_email AS email_to, m.from_email AS email_from, m.subject, m.body,
             m.status, m.error, m.gmail_message_id AS message_id, m.created_at,
-            clients.name AS client_name
+            clients.name AS client_name,
+            conv.lead_name, conv.lead_email, conv.lead_type
      FROM messages m
      LEFT JOIN clients ON clients.id = m.client_id
+     LEFT JOIN conversations conv ON conv.id = m.conversation_id
      ORDER BY m.created_at DESC
      LIMIT $1`,
     [limit]

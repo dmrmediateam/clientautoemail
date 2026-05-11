@@ -1,32 +1,167 @@
 <%
-  const title = 'Leads';
+  const title = 'CRM — All Leads';
+
+  function timeAgo(ms) {
+    if (!ms) return '—';
+    const diff = Date.now() - Number(ms);
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const d = Math.floor(h / 24);
+    if (d < 30) return d + 'd ago';
+    return Math.floor(d / 30) + 'mo ago';
+  }
+
+  function fmtDate(ms) {
+    if (!ms) return '—';
+    return new Date(Number(ms)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   const statusBadge = (s) => {
     if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
-    if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
+    if (s === 'queued') return '<span class="badge badge-warn">Queued</span>';
+    if (s === 'rate_limited') return '<span class="badge badge-warn">Rate limited</span>';
     if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
-    return '<span class="badge badge-off">' + s + '</span>';
+    return s ? '<span class="badge badge-off">' + s + '</span>' : '';
   };
+
+  const typeBadge = (t) => {
+    if (t === 'seller') return '<span class="lead-type-seller">Seller</span>';
+    return '<span class="lead-type-buyer">Buyer</span>';
+  };
+
+  const buyerCount  = conversations.filter(c => (c.lead_type || 'buyer') !== 'seller').length;
+  const sellerCount = conversations.filter(c => c.lead_type === 'seller').length;
+  const sentCount   = conversations.filter(c => c.last_status === 'sent').length;
 %>
 <%- include('_header', { brand, page, flash, title }) %>
 
-<h1>Leads</h1>
-<p class="lede">Most recent 100 webhook deliveries across all clients.</p>
+<style>
+  .crm-filters {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 20px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .crm-filters label { font-size: 12px; color: var(--fg-muted); margin-right: 4px; }
+  .crm-filters select, .crm-filters input { height: 32px; font-size: 13px; padding: 0 10px; }
+  .crm-filters input { min-width: 200px; }
+  .crm-filters .btn { height: 32px; padding: 0 14px; font-size: 13px; }
 
-<div class="panel">
-  <% if (leads.length === 0) { %>
-    <div class="empty">No leads yet.</div>
+  .crm-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .crm-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
+  .crm-stat .n { font-size: 26px; font-weight: 700; font-family: var(--mono); }
+  .crm-stat .l { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--fg-muted); margin-top: 4px; }
+
+  .crm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .crm-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--fg-muted); text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--border); }
+  .crm-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .crm-table tbody tr:last-child td { border-bottom: 0; }
+  .crm-table tbody tr:hover td { background: var(--surface-2, #F9FAFB); }
+
+  .lead-name-cell .ln { font-weight: 600; font-size: 14px; }
+  .lead-name-cell .le { font-size: 12px; color: var(--fg-muted); font-family: var(--mono); margin-top: 2px; }
+  .lead-name-cell .lp { font-size: 12px; color: var(--fg-muted); margin-top: 1px; }
+
+  .prop-cell { font-size: 12px; color: var(--fg-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .team-pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: rgba(201,166,107,.1); color: var(--accent); border: 1px solid rgba(201,166,107,.3); white-space: nowrap; }
+
+  .msg-count { font-size: 12px; font-family: var(--mono); color: var(--fg-muted); }
+
+  .open-link { font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .open-link:hover { text-decoration: underline; }
+
+  .lead-type-buyer  { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #DBEAFE; color: #1D4ED8; }
+  .lead-type-seller { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #D1FAE5; color: #065F46; }
+
+  .empty-crm { text-align: center; padding: 60px 24px; color: var(--fg-muted); }
+  .empty-crm h3 { font-size: 18px; margin: 0 0 8px; color: var(--fg); }
+  .empty-crm p { font-size: 14px; margin: 0; }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+  <div>
+    <h1 style="margin:0 0 4px">CRM</h1>
+    <p style="margin:0;color:var(--fg-muted);font-size:14px"><%= conversations.length %> lead<%= conversations.length !== 1 ? 's' : '' %> across all teams</p>
+  </div>
+</div>
+
+<div class="crm-stat-row">
+  <div class="crm-stat"><div class="n"><%= conversations.length %></div><div class="l">Total leads</div></div>
+  <div class="crm-stat"><div class="n" style="color:#1D4ED8"><%= buyerCount %></div><div class="l">Buyers</div></div>
+  <div class="crm-stat"><div class="n" style="color:#065F46"><%= sellerCount %></div><div class="l">Sellers</div></div>
+  <div class="crm-stat"><div class="n" style="color:var(--success)"><%= sentCount %></div><div class="l">Replied</div></div>
+</div>
+
+<form method="get" action="/admin/leads" class="crm-filters">
+  <div>
+    <label>Search</label>
+    <input class="input" type="text" name="q" value="<%= filters.q %>" placeholder="Name or email…" />
+  </div>
+  <div>
+    <label>Type</label>
+    <select class="input" name="type">
+      <option value="">All types</option>
+      <option value="buyer"  <%= filters.type === 'buyer'  ? 'selected' : '' %>>Buyer</option>
+      <option value="seller" <%= filters.type === 'seller' ? 'selected' : '' %>>Seller</option>
+    </select>
+  </div>
+  <div>
+    <label>Team</label>
+    <select class="input" name="team">
+      <option value="">All teams</option>
+      <% (clients || []).forEach(c => { %>
+        <option value="<%= c.id %>" <%= filters.team === c.id ? 'selected' : '' %>><%= c.name %></option>
+      <% }) %>
+    </select>
+  </div>
+  <button class="btn" type="submit">Filter</button>
+  <% if (filters.q || filters.type || filters.team) { %>
+    <a class="btn btn-ghost" href="/admin/leads">Clear</a>
+  <% } %>
+</form>
+
+<div class="panel" style="padding:0;overflow:hidden">
+  <% if (conversations.length === 0) { %>
+    <div class="empty-crm">
+      <h3>No leads yet</h3>
+      <p>Leads will appear here as webhooks come in from your clients' lead sources.</p>
+    </div>
   <% } else { %>
-    <table>
-      <thead><tr><th>When</th><th>Client</th><th>Lead</th><th>Subject</th><th>Status</th><th>Message ID / Error</th></tr></thead>
+    <table class="crm-table">
+      <thead>
+        <tr>
+          <th>Lead</th>
+          <th>Type</th>
+          <th>Team</th>
+          <th>Property</th>
+          <th>Source</th>
+          <th>Msgs</th>
+          <th>Status</th>
+          <th>Received</th>
+          <th></th>
+        </tr>
+      </thead>
       <tbody>
-        <% leads.forEach(l => { %>
+        <% conversations.forEach(conv => { %>
           <tr>
-            <td class="mono" style="font-size:12px"><%= new Date(l.created_at).toLocaleString() %></td>
-            <td><%= l.client_name || l.client_id %></td>
-            <td><%= l.email_to || '—' %></td>
-            <td><%= l.subject %></td>
-            <td><%- statusBadge(l.status) %></td>
-            <td class="mono" style="font-size:12px;color:var(--fg-muted)"><%= l.message_id || l.error || '—' %></td>
+            <td class="lead-name-cell">
+              <div class="ln"><%= conv.lead_name || 'Unknown' %></div>
+              <div class="le"><%= conv.lead_email %></div>
+              <% if (conv.lead_phone) { %><div class="lp">&#128222; <%= conv.lead_phone %></div><% } %>
+            </td>
+            <td><%- typeBadge(conv.lead_type) %></td>
+            <td><span class="team-pill"><%= conv.client_name || '—' %></span></td>
+            <td class="prop-cell" title="<%= conv.property_address || '' %>"><%= conv.property_address || '—' %></td>
+            <td style="font-size:12px;color:var(--fg-muted)"><%= conv.source || '—' %></td>
+            <td class="msg-count"><%= conv.message_count || 0 %></td>
+            <td><%- statusBadge(conv.last_status) %></td>
+            <td style="font-size:12px;color:var(--fg-muted);white-space:nowrap" title="<%= fmtDate(conv.created_at) %>"><%= timeAgo(conv.created_at) %></td>
+            <td>
+              <a class="open-link" href="/admin/conversations/<%= conv.id %>">View →</a>
+            </td>
           </tr>
         <% }) %>
       </tbody>

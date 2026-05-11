@@ -144,6 +144,51 @@ async function updateThreadId(id, threadId) {
   await query('UPDATE conversations SET thread_id = $2, updated_at = $3 WHERE id = $1', [id, threadId, now()]);
 }
 
+// Cross-client listing for admin CRM — returns conversations for all (or one) client
+// with client name, message count, and last message preview
+async function listAll({ clientId, limit = 200, offset = 0, leadType, search } = {}) {
+  const conditions = [];
+  const params = [];
+  if (clientId) {
+    params.push(clientId);
+    conditions.push(`c.client_id = $${params.length}`);
+  }
+  if (leadType) {
+    params.push(leadType);
+    conditions.push(`c.lead_type = $${params.length}`);
+  }
+  if (search) {
+    params.push(`%${search.toLowerCase()}%`);
+    const p = params.length;
+    conditions.push(`(LOWER(c.lead_email) LIKE $${p} OR LOWER(c.lead_name) LIKE $${p})`);
+  }
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+  params.push(limit, offset);
+  const r = await query(
+    `SELECT c.*,
+            cl.name AS client_name,
+            COUNT(m.id)::int AS message_count,
+            lm.subject AS last_subject,
+            lm.status  AS last_status,
+            lm.created_at AS last_message_ts
+     FROM conversations c
+     LEFT JOIN clients cl ON cl.id = c.client_id
+     LEFT JOIN messages m ON m.conversation_id = c.id
+     LEFT JOIN LATERAL (
+       SELECT subject, status, created_at
+       FROM messages
+       WHERE conversation_id = c.id
+       ORDER BY created_at DESC LIMIT 1
+     ) lm ON true
+     ${where}
+     GROUP BY c.id, cl.name, lm.subject, lm.status, lm.created_at
+     ORDER BY c.last_message_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+  return r.rows.map(rowOut);
+}
+
 module.exports = {
   findById,
   findByClientAndThread,
@@ -152,5 +197,6 @@ module.exports = {
   touch,
   listForClient,
   listWithPreview,
+  listAll,
   updateThreadId,
 };
