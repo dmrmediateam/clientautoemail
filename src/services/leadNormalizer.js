@@ -124,9 +124,29 @@ function normalize(rawPayload) {
     property_price: pick(p, ['property_price', 'price', 'listing_price']),
     message: pick(p, ['message', 'notes', 'inquiry', 'comments', 'body']),
     lead_type: normalizeLeadType(p),
-    source: pick(p, ['source', 'lead_source']) || 'Luxury Presence',
+    source: pick(p, ['source', 'lead_source']) || p._lp_lead_source || 'Luxury Presence',
+    _lp_lead_source: p._lp_lead_source || '',
     received_at: new Date().toISOString(),
   };
 }
 
-module.exports = { normalize };
+// Lead sources that should never receive an automated email response.
+// Add uppercase source strings here to skip them silently.
+const SKIPPED_SOURCES = [
+  'NEWSLETTER_SIGNUP',
+  'NEWSLETTER',
+];
+
+function shouldSkip(lead) {
+  const src = (lead._lp_lead_source || lead.source || '').toUpperCase().replace(/[\s-]+/g, '_');
+  return SKIPPED_SOURCES.some(s => src.includes(s));
+}
+
+// Also export a raw-payload version for use before normalization
+function shouldSkipRaw(rawPayload) {
+  const d = rawPayload?.data || rawPayload || {};
+  const src = (d.leadSource || d.activityAction || '').toUpperCase();
+  return SKIPPED_SOURCES.some(s => src.includes(s));
+}
+
+module.exports = { normalize, shouldSkip, shouldSkipRaw, SKIPPED_SOURCES };

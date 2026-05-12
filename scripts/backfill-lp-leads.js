@@ -104,8 +104,8 @@ async function main() {
       await query(
         `UPDATE messages
          SET to_email = $1,
-             status   = CASE WHEN status = 'failed' AND error = 'No lead email in payload'
-                             THEN 'pending' ELSE status END,
+             status   = CASE WHEN status IN ('failed', 'pending') AND error = 'No lead email in payload'
+                             THEN 'queued' ELSE status END,
              error    = CASE WHEN error = 'No lead email in payload' THEN NULL ELSE error END
          WHERE conversation_id = $2 AND direction = 'outbound'`,
         [lead.email, msg.conv_id]

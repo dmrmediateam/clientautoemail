@@ -3,11 +3,18 @@
 const conversationsRepo = require('../repos/conversations');
 const messagesRepo = require('../repos/messages');
 const tpl = require('./template');
-const { normalize } = require('./leadNormalizer');
+const { normalize, shouldSkip, shouldSkipRaw } = require('./leadNormalizer');
 const { nextWindowStart } = require('./scheduler');
 
 async function processLead({ client, rawPayload }) {
   const lead = normalize(rawPayload);
+
+  // Silently skip lead sources that should not receive automated emails.
+  if (shouldSkipRaw(rawPayload) || shouldSkip(lead)) {
+    console.log(`[dispatcher] skipping lead source "${lead._lp_lead_source || lead.source}" for client ${client.id}`);
+    return { ok: false, reason: 'skipped_source', source: lead._lp_lead_source || lead.source };
+  }
+
   const settings = client.settings || {};
 
   const data = {

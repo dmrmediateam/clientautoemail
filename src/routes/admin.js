@@ -90,9 +90,10 @@ router.get('/clients/:id', async (req, res, next) => {
   try {
     const client = await clientsRepo.findById(req.params.id);
     if (!client) return res.status(404).send('Client not found');
+    const selectedMember = req.query.member || null;
     const [recent, conversations, teamMembers] = await Promise.all([
       leadsRepo.recentForClient(client.id, 25),
-      conversationsRepo.listWithPreview(client.id, 50),
+      conversationsRepo.listWithPreview(client.id, 50, selectedMember),
       clientsRepo.listUsersForClient(client.id),
     ]);
     res.render('client_detail', {
@@ -101,6 +102,7 @@ router.get('/clients/:id', async (req, res, next) => {
       recent,
       conversations,
       teamMembers,
+      selectedMember,
       flash: flashFromQuery(req),
       publicBaseUrl: config.publicBaseUrl,
     });

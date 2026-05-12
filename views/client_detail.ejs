@@ -1,182 +1,282 @@
 <%
   const title = client.name;
+  const description = client.name + (client.website ? ' · ' + client.website : '') + ' — lead response team';
   const webhookUrl = publicBaseUrl + '/v1/webhooks/incoming/' + client.id;
   const s = client.settings || {};
-  const statusBadge = (s) => {
-    if (s === 'sent') return '<span class="badge badge-on">Sent</span>';
-    if (s === 'fallback') return '<span class="badge badge-warn">Fallback</span>';
-    if (s === 'failed') return '<span class="badge badge-err">Failed</span>';
-    if (s === 'queued') return '<span class="badge badge-warn">Queued</span>';
-    return '<span class="badge badge-off">' + s + '</span>';
+  const convList = typeof conversations !== 'undefined' ? conversations : [];
+  const members = typeof teamMembers !== 'undefined' ? teamMembers : [];
+  const selMember = typeof selectedMember !== 'undefined' ? selectedMember : null;
+
+  const statusBadge = (st) => {
+    if (st === 'sent')         return '<span class="badge badge-on">Sent</span>';
+    if (st === 'queued')       return '<span class="badge badge-warn">Queued</span>';
+    if (st === 'rate_limited') return '<span class="badge badge-warn">Rate limited</span>';
+    if (st === 'failed')       return '<span class="badge badge-err">Failed</span>';
+    return '<span class="badge badge-off">' + (st || '—') + '</span>';
+  };
+  const typeBadge = (t) => {
+    if (t === 'seller') return '<span class="lead-type-seller">Seller</span>';
+    return '<span class="lead-type-buyer">Buyer</span>';
   };
   function timeAgo(ms) {
-    const diff = Date.now() - ms;
+    if (!ms) return '—';
+    const diff = Date.now() - Number(ms);
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'just now';
     if (m < 60) return m + 'm ago';
     const h = Math.floor(m / 60);
     if (h < 24) return h + 'h ago';
-    return Math.floor(h / 24) + 'd ago';
+    const d = Math.floor(h / 24);
+    if (d < 30) return d + 'd ago';
+    return Math.floor(d / 30) + 'mo ago';
   }
+  const sentCount   = convList.filter(c => c.last_status === 'sent').length;
+  const failedCount = convList.filter(c => c.last_status === 'failed').length;
+  const queuedCount = convList.filter(c => c.last_status === 'queued' || c.last_status === 'rate_limited').length;
 %>
-<%- include('_header', { brand, page, flash, title }) %>
+<%- include('_header', { brand, page, flash, title, description }) %>
 
-<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-  <div>
-    <h1><%= client.name %></h1>
-    <p class="lede">
-      <% if (client.active) { %><span class="badge badge-on">Active</span>
-      <% } else { %><span class="badge badge-off">Paused</span><% } %>
-      <% if (client.google.connected) { %><span class="badge badge-on">Gmail Connected</span>
-      <% } else { %><span class="badge badge-warn">Gmail Not Connected</span><% } %>
-      <% if (client.website) { %> · <span class="mono" style="font-size:13px"><%= client.website %></span><% } %>
-    </p>
+<style>
+  /* ── Hero ── */
+  .cd-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:28px; }
+  .cd-hero-left { flex:1; min-width:0; }
+  .cd-teamname { font-size:26px; font-weight:800; letter-spacing:-.4px; margin:0 0 6px; line-height:1.1; }
+  .cd-website { display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--accent); font-family:var(--mono); text-decoration:none; border-bottom:1px dashed rgba(201,166,107,.4); padding-bottom:1px; }
+  .cd-website:hover { border-bottom-style:solid; }
+  .cd-status-row { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .cd-hero-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+
+  /* ── Stats ── */
+  .cd-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-bottom:28px; }
+  .cd-stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
+  .cd-stat .n { font-size:24px; font-weight:700; font-family:var(--mono); }
+  .cd-stat .l { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--fg-muted); margin-top:4px; }
+  .cd-stat.green .n { color:var(--success); }
+  .cd-stat.red   .n { color:var(--error); }
+  .cd-stat.yellow .n { color:#D97706; }
+
+  /* ── Members ── */
+  .members-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:28px; }
+  .member-card { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); text-decoration:none; color:var(--fg); transition:border-color .15s,background .15s; }
+  .member-card:hover { border-color:var(--accent); text-decoration:none; }
+  .member-card.active { border-color:var(--accent); background:rgba(201,166,107,.08); }
+  .member-avatar { width:36px; height:36px; border-radius:50%; background:rgba(201,166,107,.2); border:2px solid rgba(201,166,107,.3); display:grid; place-items:center; font-size:13px; font-weight:700; color:var(--accent); flex-shrink:0; }
+  .member-avatar.grey { background:var(--surface-2,#F4F5F7); border-color:var(--border); color:var(--fg-muted); }
+  .member-info { min-width:0; }
+  .member-name { font-size:13px; font-weight:600; white-space:nowrap; }
+  .member-email { font-size:11px; color:var(--fg-muted); font-family:var(--mono); white-space:nowrap; }
+  .member-status { display:flex; gap:5px; margin-top:3px; flex-wrap:wrap; }
+  .member-card.all-card { border-style:dashed; }
+  .member-card.all-card.active { border-style:solid; }
+
+  /* ── Table ── */
+  .section-head { display:flex; align-items:center; justify-content:space-between; margin:0 0 14px; gap:10px; flex-wrap:wrap; }
+  .section-head h2 { margin:0; font-size:15px; font-weight:700; }
+  .cd-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .cd-table th { font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:var(--fg-muted); text-align:left; padding:9px 12px; border-bottom:2px solid var(--border); white-space:nowrap; }
+  .cd-table td { padding:11px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .cd-table tbody tr:last-child td { border-bottom:0; }
+  .cd-table tbody tr:hover { background:rgba(201,166,107,.04); }
+  .lead-type-buyer  { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; background:#DBEAFE; color:#1D4ED8; }
+  .lead-type-seller { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; background:#D1FAE5; color:#065F46; }
+
+  /* ── Config grid ── */
+  .cd-panels { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:28px; }
+  @media (max-width:760px) { .cd-panels { grid-template-columns:1fr; } }
+  .cd-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; }
+  .cd-panel h3 { margin:0 0 14px; font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--fg-muted); }
+  .kv2 { display:grid; grid-template-columns:auto 1fr; gap:5px 14px; align-items:baseline; }
+  .kv2 .k2 { color:var(--fg-muted); font-size:12px; white-space:nowrap; }
+  .kv2 .v2 { font-family:var(--mono); font-size:12px; word-break:break-all; }
+  .code-copy { background:var(--surface-2,#F4F5F7); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:11px; font-family:var(--mono); word-break:break-all; cursor:pointer; transition:background .12s; }
+  .code-copy:hover { background:rgba(201,166,107,.1); }
+</style>
+
+<!-- HERO -->
+<div class="cd-hero">
+  <div class="cd-hero-left">
+    <div class="cd-teamname"><%= client.name %></div>
+    <% if (client.website) { %>
+      <a class="cd-website" href="<%= client.website.startsWith('http') ? client.website : 'https://' + client.website %>" target="_blank" rel="noopener">&#127758; <%= client.website.replace(/^https?:\/\//,'') %></a>
+    <% } %>
+    <div class="cd-status-row">
+      <% if (client.active && client.google && client.google.connected) { %>
+        <span class="badge badge-on">&#9679; Live</span>
+        <span style="font-size:12px;color:var(--fg-muted)">Sending via <span class="mono"><%= client.google.email || client.agent_email %></span></span>
+      <% } else if (!client.active) { %>
+        <span class="badge badge-off">Paused</span>
+      <% } else { %>
+        <span class="badge badge-warn">Gmail not connected</span>
+      <% } %>
+    </div>
   </div>
-  <div class="actions">
-    <a class="btn" href="/admin/clients/<%= client.id %>/edit">Edit</a>
+  <div class="cd-hero-actions">
+    <form action="/admin/clients/<%= client.id %>/impersonate" method="post">
+      <input type="hidden" name="redirect" value="/dashboard/template" />
+      <button class="btn" type="submit" style="background:#111827;color:#fff;border-color:#111827">Edit Replies</button>
+    </form>
+    <form action="/admin/clients/<%= client.id %>/impersonate" method="post">
+      <button class="btn" type="submit" style="background:var(--accent);color:#fff;border-color:var(--accent)">Open Dashboard →</button>
+    </form>
     <% if (client.active) { %>
-      <form action="/admin/clients/<%= client.id %>/pause" method="post" style="display:inline">
-        <button class="btn" type="submit">Pause auto-responses</button>
+      <form action="/admin/clients/<%= client.id %>/toggle-active" method="post">
+        <button class="btn" type="submit" style="color:#B45309;border-color:#B45309">&#9208; Pause</button>
       </form>
     <% } else { %>
-      <form action="/admin/clients/<%= client.id %>/resume" method="post" style="display:inline">
-        <button class="btn btn-primary" type="submit">Resume auto-responses</button>
+      <form action="/admin/clients/<%= client.id %>/toggle-active" method="post">
+        <button class="btn" type="submit" style="color:var(--success);border-color:var(--success)">&#9654; Resume</button>
       </form>
     <% } %>
-    <form action="/admin/clients/<%= client.id %>/impersonate" method="post" style="display:inline">
-      <button class="btn" type="submit" style="background:var(--accent);color:#fff;border-color:var(--accent)">Open Team Dashboard →</button>
-    </form>
   </div>
 </div>
 
-<div class="panel">
-  <h2 style="margin-top:0">Setup</h2>
-  <div class="kv" style="margin-bottom:12px">
-    <div class="k">1. Agent login link</div>
-    <div class="v">
-      <div class="code-block"><%= publicBaseUrl %>/onboarding</div>
-      <p class="help">Send this to the agent. They click "Connect Gmail" and sign in with the account that will send emails.</p>
+<!-- STATS -->
+<div class="cd-stats">
+  <div class="cd-stat">
+    <div class="n"><%= convList.length %></div>
+    <div class="l"><%= selMember ? 'Filtered leads' : 'Total leads' %></div>
+  </div>
+  <div class="cd-stat green">
+    <div class="n"><%= sentCount %></div>
+    <div class="l">Emails sent</div>
+  </div>
+  <div class="cd-stat yellow">
+    <div class="n"><%= queuedCount %></div>
+    <div class="l">Queued</div>
+  </div>
+  <div class="cd-stat red">
+    <div class="n"><%= failedCount %></div>
+    <div class="l">Failed</div>
+  </div>
+  <div class="cd-stat">
+    <div class="n" style="font-size:14px"><%= s.send_window_start || '08:30' %>–<%= s.send_window_end || '18:00' %></div>
+    <div class="l">Window · <%= (s.timezone || 'America/Chicago').replace('America/','') %></div>
+  </div>
+</div>
+
+<!-- TEAM MEMBERS -->
+<div class="section-head">
+  <h2>Team members (<%= members.length %>)</h2>
+  <a href="/admin/clients/<%= client.id %>/edit" class="btn btn-ghost" style="font-size:12px">Edit settings</a>
+</div>
+<div class="members-row">
+  <a href="/admin/clients/<%= client.id %>" class="member-card all-card <%= !selMember ? 'active' : '' %>">
+    <div class="member-avatar grey" style="font-size:16px">&#9681;</div>
+    <div class="member-info">
+      <div class="member-name">All members</div>
+      <div class="member-email">All lead activity</div>
     </div>
-    <div class="k">2. Webhook URL</div>
-    <div class="v">
-      <div class="code-block"><%= webhookUrl %></div>
-      <p class="help">Paste into Luxury Presence (or any lead source) as the POST destination. Method: POST · Content-Type: application/json</p>
+  </a>
+  <% members.forEach(function(m) {
+    const initials = (m.name || m.email).split(/[\s@]+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase();
+    const isActive = selMember === m.email;
+  %>
+  <a href="/admin/clients/<%= client.id %>?member=<%= encodeURIComponent(m.email) %>" class="member-card <%= isActive ? 'active' : '' %>">
+    <div class="member-avatar <%= m.connected ? '' : 'grey' %>"><%= initials %></div>
+    <div class="member-info">
+      <div class="member-name"><%= m.name && m.name !== m.email ? m.name : m.email.split('@')[0] %></div>
+      <div class="member-email"><%= m.email %></div>
+      <div class="member-status">
+        <% if (m.role === 'owner') { %><span class="badge badge-on" style="font-size:9px;padding:1px 5px">Owner</span><% } %>
+        <% if (m.connected) { %><span class="badge badge-on" style="font-size:9px;padding:1px 5px">Gmail &#10003;</span>
+        <% } else { %><span class="badge badge-warn" style="font-size:9px;padding:1px 5px">No Gmail</span><% } %>
+      </div>
     </div>
-    <% if (client.settings && client.settings.cc_email) { %>
-    <div class="k">CC on every email</div>
-    <div class="v mono"><%= client.settings.cc_email %></div>
-    <% } %>
-  </div>
+  </a>
+  <% }); %>
 </div>
 
-<div class="panel">
-  <h2 style="margin-top:0">Identity</h2>
-  <div class="kv">
-    <div class="k">Agent name</div><div class="v"><%= client.agent_name %></div>
-    <div class="k">From email</div><div class="v mono"><%= client.agent_email %></div>
-    <div class="k">Phone</div><div class="v"><%= client.agent_phone || '—' %></div>
-    <div class="k">Connected Gmail</div><div class="v mono"><%= client.google.email || '—' %></div>
-    <div class="k">CC email</div><div class="v mono"><%= s.cc_email || '—' %></div>
-    <div class="k">SendGrid key</div>
-    <div class="v">
-      <% if (client.sendgrid_api_key) { %><span class="badge badge-on">Per-client</span>
-      <% } else { %><span class="badge badge-off">Master fallback</span><% } %>
-    </div>
-  </div>
-</div>
-
-<div class="panel">
-  <h2 style="margin-top:0">Campaign settings</h2>
-  <div class="kv">
-    <div class="k">Send window</div>
-    <div class="v"><%= s.send_window_start || '08:30' %> – <%= s.send_window_end || '18:00' %> &nbsp;<span class="mono" style="font-size:12px"><%= s.timezone || 'America/Chicago' %></span></div>
-    <div class="k">Daily send cap</div><div class="v"><%= s.daily_send_limit || 5 %> emails/day</div>
-    <div class="k">Buyer sender</div><div class="v mono"><%= s.buyer_sender_email || s.send_from_email || client.google.email || '— (owner account)' %></div>
-    <div class="k">Seller sender</div><div class="v mono"><%= s.seller_sender_email || s.send_from_email || client.google.email || '— (owner account)' %></div>
-    <div class="k">Team signature</div><div class="v"><%= s.team_signature_enabled ? 'Enabled — appends "' + client.name + ' Team"' : 'Disabled' %></div>
-  </div>
-</div>
-
-<div class="panel">
-  <h2 style="margin-top:0">Templates</h2>
-  <div class="kv">
-    <div class="k">Buyer subject</div><div class="v mono"><%= client.templates?.buyer?.subject || client.template?.subject || '—' %></div>
-    <div class="k">Buyer body</div><div class="v"><pre class="code-block" style="white-space:pre-wrap;max-height:160px;overflow:auto"><%= client.templates?.buyer?.body || client.template?.body || '—' %></pre></div>
-    <div class="k">Seller subject</div><div class="v mono"><%= client.templates?.seller?.subject || '—' %></div>
-    <div class="k">Seller body</div><div class="v"><pre class="code-block" style="white-space:pre-wrap;max-height:160px;overflow:auto"><%= client.templates?.seller?.body || '—' %></pre></div>
-  </div>
-  <div class="actions" style="margin-top:14px">
-    <a class="btn" href="/admin/clients/<%= client.id %>/edit">Edit templates &amp; settings</a>
-  </div>
-</div>
-
-<% if (typeof teamMembers !== 'undefined' && teamMembers.length > 0) { %>
-<div class="panel">
-  <h2 style="margin-top:0">Team members</h2>
-  <table>
-    <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Gmail</th></tr></thead>
-    <tbody>
-      <% teamMembers.forEach(u => { %>
-        <tr>
-          <td class="mono" style="font-size:13px"><%= u.email %></td>
-          <td><%= u.name || '—' %></td>
-          <td><span class="badge <%= u.role === 'owner' ? 'badge-on' : 'badge-off' %>"><%= u.role %></span></td>
-          <td>
-            <% if (u.connected) { %><span class="badge badge-on">Connected</span>
-            <% } else { %><span class="badge badge-warn">Not connected</span><% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-</div>
-<% } %>
-
-<div class="panel">
-  <h2 style="margin-top:0">Send a test</h2>
-  <form action="/admin/clients/<%= client.id %>/test" method="post">
-    <label>Recipient email</label>
-    <input class="input" type="email" name="to" value="<%= client.agent_email %>" />
-    <p class="help">A sample lead is generated and sent through the same pipeline a real webhook uses.</p>
-    <div class="actions" style="margin-top:14px">
-      <button type="submit" class="btn btn-primary" <%= !client.google.connected ? 'disabled' : '' %>>Send test email</button>
-      <% if (!client.google.connected) { %><span class="help">Client must sign in via /onboarding first.</span><% } %>
-    </div>
-  </form>
-</div>
-
-<h2>Conversations &amp; recent activity</h2>
-<div class="panel">
-  <% const convList = typeof conversations !== 'undefined' ? conversations : []; %>
-  <% if (convList.length === 0) { %>
-    <div class="empty">No leads yet.</div>
+<!-- LEAD ACTIVITY -->
+<div class="section-head">
+  <h2>Lead activity</h2>
+  <% if (selMember) { %>
+    <span style="font-size:12px;color:var(--fg-muted)">Filtered to <strong style="color:var(--accent)"><%= selMember %></strong> &nbsp;·&nbsp; <a href="/admin/clients/<%= client.id %>" style="font-size:12px">Clear filter</a></span>
   <% } else { %>
-    <table>
-      <thead><tr><th>When</th><th>Lead</th><th>Type</th><th>Property</th><th>Last email</th><th>Status</th></tr></thead>
+    <a href="/admin/leads?team=<%= client.id %>" class="btn btn-ghost" style="font-size:12px">Open in CRM →</a>
+  <% } %>
+</div>
+<div class="panel" style="padding:0;margin-bottom:28px">
+  <% if (convList.length === 0) { %>
+    <div class="empty" style="padding:32px">
+      <% if (selMember) { %>No leads sent by <strong><%= selMember %></strong> yet.<% } else { %>No leads yet. Webhooks will appear here once connected.<% } %>
+    </div>
+  <% } else { %>
+    <table class="cd-table">
+      <thead>
+        <tr>
+          <th>Received</th>
+          <th>Lead</th>
+          <th>Type</th>
+          <th>Property</th>
+          <th>Subject</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
       <tbody>
-        <% convList.forEach(c => { %>
+        <% convList.forEach(function(c) { %>
           <tr>
-            <td class="mono" style="font-size:11px"><%= timeAgo(c.last_message_at) %></td>
+            <td style="font-size:11px;color:var(--fg-muted);font-family:var(--mono);white-space:nowrap"><%= timeAgo(c.last_message_at || c.created_at) %></td>
             <td>
-              <div style="font-weight:500;font-size:13px"><%= c.lead_name || c.lead_email %></div>
-              <% if (c.lead_name) { %><div class="mono" style="font-size:11px;color:var(--fg-muted)"><%= c.lead_email %></div><% } %>
+              <div style="font-weight:600;font-size:13px"><%= c.lead_name || c.lead_email %></div>
+              <% if (c.lead_name && c.lead_email) { %>
+                <div style="font-size:11px;color:var(--fg-muted);font-family:var(--mono)"><%= c.lead_email %></div>
+              <% } %>
+              <% if (c.lead_phone) { %><div style="font-size:11px;color:var(--fg-muted)"><%= c.lead_phone %></div><% } %>
             </td>
-            <td><span class="badge <%= c.lead_type === 'seller' ? 'badge-warn' : 'badge-off' %>"><%= c.lead_type || 'buyer' %></span></td>
-            <td style="font-size:12px;color:var(--fg-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= c.property_address || '—' %></td>
-            <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= c.last_subject || '—' %></td>
+            <td><%- typeBadge(c.lead_type) %></td>
+            <td style="font-size:12px;color:var(--fg-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= c.property_address || '—' %></td>
+            <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg-muted)"><%= c.last_subject || '—' %></td>
             <td><%- statusBadge(c.last_status || 'queued') %></td>
+            <td style="white-space:nowrap"><a href="/admin/conversations/<%= c.id %>" style="font-size:12px;color:var(--accent);font-weight:600">View →</a></td>
           </tr>
-        <% }) %>
+        <% }); %>
       </tbody>
     </table>
   <% } %>
 </div>
 
-<div class="panel" style="border-color: rgba(248,113,113,.3)">
-  <h2 style="margin-top:0;color:var(--error)">Danger zone</h2>
+<!-- CONFIG PANELS -->
+<div class="cd-panels">
+  <div class="cd-panel">
+    <h3>Webhook URL</h3>
+    <div class="code-copy" onclick="navigator.clipboard.writeText(this.dataset.val);this.textContent='Copied!';setTimeout(()=>{this.textContent=this.dataset.val},1800)" data-val="<%= webhookUrl %>"><%= webhookUrl %></div>
+    <p style="font-size:11px;color:var(--fg-muted);margin:8px 0 0">POST endpoint for Luxury Presence. Click to copy.</p>
+  </div>
+  <div class="cd-panel">
+    <h3>Send settings</h3>
+    <div class="kv2">
+      <span class="k2">Window</span><span class="v2"><%= s.send_window_start || '08:30' %> – <%= s.send_window_end || '18:00' %> <%= s.timezone || 'America/Chicago' %></span>
+      <span class="k2">Daily cap</span><span class="v2"><%= s.daily_send_limit || 5 %> / day</span>
+      <span class="k2">Buyer from</span><span class="v2"><%= s.buyer_sender_email || s.send_from_email || client.google.email || '—' %></span>
+      <span class="k2">Seller from</span><span class="v2"><%= s.seller_sender_email || s.send_from_email || client.google.email || '—' %></span>
+      <% if (s.cc_email) { %><span class="k2">CC</span><span class="v2"><%= s.cc_email %></span><% } %>
+    </div>
+  </div>
+  <div class="cd-panel">
+    <h3>Templates</h3>
+    <div class="kv2">
+      <span class="k2">Buyer subj.</span><span class="v2"><%= client.templates && client.templates.buyer ? client.templates.buyer.subject : '—' %></span>
+      <span class="k2">Seller subj.</span><span class="v2"><%= client.templates && client.templates.seller ? client.templates.seller.subject : '—' %></span>
+    </div>
+    <a href="/admin/clients/<%= client.id %>/edit" class="btn btn-ghost" style="margin-top:12px;font-size:12px;display:inline-block">Edit templates</a>
+  </div>
+  <div class="cd-panel">
+    <h3>Test send</h3>
+    <form action="/admin/clients/<%= client.id %>/test" method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="input" type="email" name="to" value="<%= client.agent_email %>" style="flex:1;min-width:160px" />
+      <button type="submit" class="btn btn-primary" <%= !client.google.connected ? 'disabled' : '' %>>Send test</button>
+    </form>
+    <% if (!client.google.connected) { %><p style="font-size:11px;color:var(--fg-muted);margin:6px 0 0">Gmail must be connected first.</p><% } %>
+  </div>
+</div>
+
+<!-- DANGER -->
+<div class="panel" style="border-color:rgba(248,113,113,.3);margin-top:16px">
+  <h3 style="margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--error)">Danger zone</h3>
   <form action="/admin/clients/<%= client.id %>/delete" method="post"
-        onsubmit="return confirm('Delete <%= client.name.replace(/'/g, "\\'") %> and all its lead history? This cannot be undone.');">
-    <button class="btn btn-danger" type="submit">Delete client</button>
+        onsubmit="return confirm('Delete <%= client.name.replace(/'/g, "\\'") %> and all lead history? This cannot be undone.');">
+    <button class="btn btn-danger" type="submit">Delete team</button>
   </form>
 </div>
 

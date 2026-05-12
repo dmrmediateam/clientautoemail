@@ -115,7 +115,17 @@ async function listForClient(clientId, limit = 50) {
   return r.rows.map(rowOut);
 }
 
-async function listWithPreview(clientId, limit = 50) {
+async function listWithPreview(clientId, limit = 50, senderEmail = null) {
+  const params = [clientId];
+  let senderClause = '';
+  if (senderEmail) {
+    params.push(senderEmail);
+    senderClause = `AND EXISTS (
+      SELECT 1 FROM messages ms
+      WHERE ms.conversation_id = c.id AND ms.from_email = $2
+    )`;
+  }
+  params.push(limit);
   const r = await query(
     `SELECT c.*,
             m.subject AS last_subject,
@@ -131,10 +141,10 @@ async function listWithPreview(clientId, limit = 50) {
        ORDER BY created_at DESC
        LIMIT 1
      ) m ON true
-     WHERE c.client_id = $1
+     WHERE c.client_id = $1 ${senderClause}
      ORDER BY c.last_message_at DESC
-     LIMIT $2`,
-    [clientId, limit]
+     LIMIT $${params.length}`,
+    params
   );
   return r.rows.map(rowOut);
 }
