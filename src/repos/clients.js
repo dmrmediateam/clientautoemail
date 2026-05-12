@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { query } = require('../db');
 const enc = require('../crypto');
 const clientSettingsRepo = require('./clientSettings');
+const config = require('../config');
 
 function now() { return Date.now(); }
 
@@ -82,7 +83,12 @@ async function findByGoogleEmail(email) {
 }
 
 async function findAll() {
-  const r = await query('SELECT * FROM clients ORDER BY created_at DESC');
+  // Exclude the system/admin client (DMR Media Team) from all listings
+  const adminEmail = config.admin.superAdminEmail;
+  const r = await query(
+    'SELECT * FROM clients WHERE agent_email != $1 ORDER BY created_at DESC',
+    [adminEmail]
+  );
   const out = [];
   for (const row of r.rows) {
     const settings = await clientSettingsRepo.findByClientId(row.id);
