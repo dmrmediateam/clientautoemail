@@ -203,7 +203,7 @@
             <div class="thread-wrap">
               <% messages.forEach(function(m) {
                 const isOut = m.direction === 'outbound';
-                const statusMap = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn' };
+                const statusMap = { sent:'badge-on', failed:'badge-err', queued:'badge-off', rate_limited:'badge-warn', pending:'badge-warn' };
                 const sc = statusMap[m.status] || 'badge-off';
                 const ts = fmtTs(m.sent_at || m.created_at);
                 const fromLabel = isOut
@@ -233,6 +233,21 @@
             </div>
           <% } %>
         </div>
+
+        <% const pendingMsgs = messages.filter(function(m){ return m.status === 'pending'; }); %>
+        <% if (pendingMsgs.length) { %>
+        <div class="panel" style="padding:20px;border:2px solid rgba(245,158,11,.5);background:rgba(245,158,11,.05)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:15px;font-weight:600;margin-bottom:4px">&#9888;&#65039; <%= pendingMsgs.length %> message<%= pendingMsgs.length !== 1 ? 's' : '' %> awaiting approval</div>
+              <div style="font-size:13px;color:var(--fg-muted)">Review the draft<%= pendingMsgs.length !== 1 ? 's' : '' %> above, then approve to queue for sending within the business window.</div>
+            </div>
+            <form action="/dashboard/conversations/<%= conversation.id %>/approve" method="post">
+              <button type="submit" class="btn btn-primary" style="background:#F59E0B;border-color:#F59E0B;color:#000;font-weight:700">&#10003; Approve &amp; Send</button>
+            </form>
+          </div>
+        </div>
+        <% } %>
 
         <div class="reply-panel">
           <div class="reply-hd">

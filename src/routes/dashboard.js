@@ -20,6 +20,7 @@ function flashFromQuery(req) {
   if (q.paused) return { type: 'info', text: 'Bridge paused. Webhooks will be ignored until you resume.' };
   if (q.resumed) return { type: 'success', text: 'Bridge resumed.' };
   if (q.replied) return { type: 'success', text: 'Reply queued and ready to send.' };
+  if (q.approved) return { type: 'success', text: `Approved — ${q.approved} message${q.approved > 1 ? 's' : ''} queued for sending.` };
   return null;
 }
 
@@ -160,6 +161,17 @@ router.get('/conversations/:id', async (req, res, next) => {
       page: 'dashboard',
       flash: flashFromQuery(req),
     });
+  } catch (err) { next(err); }
+});
+
+router.post('/conversations/:id/approve', async (req, res, next) => {
+  try {
+    const conversation = await conversationsRepo.findById(req.params.id);
+    if (!conversation || conversation.client_id !== req.client.id) {
+      return res.status(404).send('Conversation not found');
+    }
+    const count = await messagesRepo.approvePending(conversation.id);
+    res.redirect(`/dashboard/conversations/${conversation.id}?approved=${count}`);
   } catch (err) { next(err); }
 });
 

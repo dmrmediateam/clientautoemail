@@ -135,6 +135,17 @@ async function getById(id) {
   return r.rows[0] ? rowOut(r.rows[0]) : null;
 }
 
+async function approvePending(conversationId) {
+  const r = await query(
+    `UPDATE messages
+     SET status = 'queued'
+     WHERE conversation_id = $1 AND status = 'pending'
+     RETURNING id`,
+    [conversationId]
+  );
+  return r.rowCount;
+}
+
 async function findByGmailMessageId(gmailMessageId) {
   if (!gmailMessageId) return null;
   const r = await query(
@@ -154,4 +165,5 @@ module.exports = {
   listRecentByClient,
   getById,
   findByGmailMessageId,
+  approvePending,
 };
