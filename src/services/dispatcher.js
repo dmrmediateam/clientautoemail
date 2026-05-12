@@ -107,7 +107,7 @@ async function processLead({ client, rawPayload }) {
     to_email: lead.email,
     subject,
     body,
-    status: 'pending',
+    status: 'queued',
     scheduled_for: scheduledFor,
     raw_payload: rawPayload,
   });
