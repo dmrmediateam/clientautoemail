@@ -49,6 +49,8 @@ function rowToClient(row, settings) {
       buyer_sender_email: effectiveSettings.buyer_sender_email || '',
       seller_sender_email: effectiveSettings.seller_sender_email || '',
       team_signature_enabled: !!effectiveSettings.team_signature_enabled,
+      buyer_paused: !!effectiveSettings.buyer_paused,
+      seller_paused: !!effectiveSettings.seller_paused,
     },
     google: {
       access_token: row.google_access_token_encrypted ? enc.decrypt(row.google_access_token_encrypted) : null,

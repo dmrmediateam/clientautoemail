@@ -15,7 +15,16 @@ async function processLead({ client, rawPayload }) {
     return { ok: false, reason: 'skipped_source', source: lead._lp_lead_source || lead.source };
   }
 
+  // Per-client campaign pause flags.
   const settings = client.settings || {};
+  if (lead.lead_type === 'buyer' && settings.buyer_paused) {
+    console.log(`[dispatcher] buyer campaign paused for client ${client.id}`);
+    return { ok: false, reason: 'campaign_paused', lead_type: 'buyer' };
+  }
+  if (lead.lead_type === 'seller' && settings.seller_paused) {
+    console.log(`[dispatcher] seller campaign paused for client ${client.id}`);
+    return { ok: false, reason: 'campaign_paused', lead_type: 'seller' };
+  }
 
   const data = {
     ...lead,
