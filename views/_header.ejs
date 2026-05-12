@@ -4,6 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title><%= typeof title !== 'undefined' && title ? title + ' — ' : '' %><%= brand.name %> · <%= brand.tagline %></title>
+<meta name="description" content="<%= typeof description !== 'undefined' && description ? description : brand.tagline %>">
+<meta name="robots" content="noindex,nofollow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="<%= (typeof title !== 'undefined' && title ? title + ' — ' : '') + brand.name %>">
+<meta property="og:description" content="<%= typeof description !== 'undefined' && description ? description : brand.tagline %>">
+<meta name="theme-color" content="#C9A66B">
 <link rel="stylesheet" href="/static/css/dmr.css" />
 </head>
 <body>

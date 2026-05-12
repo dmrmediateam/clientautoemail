@@ -71,7 +71,7 @@ async function recentForClient(clientId, limit = 25) {
 
 async function recent(limit = 50) {
   const r = await query(
-    `SELECT m.id, m.client_id, m.to_email AS email_to, m.from_email AS email_from, m.subject, m.body,
+    `SELECT m.id, m.conversation_id, m.client_id, m.to_email AS email_to, m.from_email AS email_from, m.subject, m.body,
             m.status, m.error, m.gmail_message_id AS message_id, m.created_at,
             clients.name AS client_name,
             conv.lead_name, conv.lead_email, conv.lead_type

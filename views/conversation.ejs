@@ -17,6 +17,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title><%= title %> — <%= brand.name %></title>
+<meta name="description" content="<%= conversation.lead_type === 'seller' ? 'Seller' : 'Buyer' %> lead conversation with <%= conversation.lead_name || conversation.lead_email %><%= conversation.property_address ? ' re: ' + conversation.property_address : '' %>">
+<meta name="robots" content="noindex,nofollow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="<%= title %> — <%= brand.name %>">
+<meta property="og:description" content="<%= conversation.lead_type === 'seller' ? 'Seller' : 'Buyer' %> via <%= conversation.source || 'direct' %>">
+<meta name="theme-color" content="#C9A66B">
 <link rel="stylesheet" href="/static/css/dmr.css" />
 <style>
   .conv-layout {

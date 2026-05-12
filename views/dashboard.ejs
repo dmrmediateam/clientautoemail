@@ -1,5 +1,6 @@
 <% const title = 'Admin Overview'; %>
-<%- include('_header', { brand, page, flash, title }) %>
+<% const description = clients.length + ' team' + (clients.length !== 1 ? 's' : '') + ' · ' + (stats.total || 0) + ' total lead responses processed'; %>
+<%- include('_header', { brand, page, flash, title, description }) %>
 
 <style>
   .admin-hero { margin-bottom: 28px; }
@@ -157,6 +158,7 @@
         </form>
       </div>
       <div class="tc-actions" style="margin-top:8px">
+        <a class="btn btn-ghost" href="/admin/leads?team=<%= c.id %>" style="flex:1;text-align:center">Leads →</a>
         <a class="btn btn-ghost" href="/admin/clients/<%= c.id %>" style="flex:1;text-align:center">Details</a>
         <% if (c.active) { %>
           <form action="/admin/clients/<%= c.id %>/toggle-active" method="post" style="flex:1">
@@ -189,6 +191,7 @@
           <th>Type</th>
           <th>Subject</th>
           <th>Status</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -204,6 +207,7 @@
             </td>
             <td style="font-size:12px;color:var(--fg-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= l.subject || '—' %></td>
             <td><%- statusBadge(l.status) %></td>
+            <td style="white-space:nowrap"><% if (l.conversation_id) { %><a href="/admin/conversations/<%= l.conversation_id %>" style="font-size:12px;color:var(--accent);font-weight:600">View →</a><% } %></td>
           </tr>
         <% }) %>
       </tbody>

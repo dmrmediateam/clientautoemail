@@ -1,5 +1,6 @@
 <%
   const title = 'CRM — All Leads';
+  const description = conversations.length + ' lead' + (conversations.length !== 1 ? 's' : '') + ' across all teams';
 
   function timeAgo(ms) {
     if (!ms) return '—';
@@ -36,7 +37,7 @@
   const sellerCount = conversations.filter(c => c.lead_type === 'seller').length;
   const sentCount   = conversations.filter(c => c.last_status === 'sent').length;
 %>
-<%- include('_header', { brand, page, flash, title }) %>
+<%- include('_header', { brand, page, flash, title, description }) %>
 
 <style>
   .crm-filters {
