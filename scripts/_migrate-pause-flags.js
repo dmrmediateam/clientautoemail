@@ -40,12 +40,31 @@ async function run() {
   console.log(`\nDeleted ${del.rowCount} queued buyer message(s):`);
   del.rows.forEach(r => console.log(`  #${r.id} → ${r.to_email}`));
 
-  // 4. Show current settings
+  // 3. Show current settings (don't delete or modify anything else)
   const s = await query(
-    'SELECT send_from_email, seller_sender_email, buyer_sender_email, cc_email, buyer_paused, seller_paused FROM client_settings WHERE client_id = $1',
-    [CLIENT_ID]
+    `SELECT send_from_email, seller_sender_email, buyer_sender_email,
+            cc_email, buyer_paused, seller_paused, send_window_start, send_window_end, timezone
+     FROM client_settings WHERE client_id = $1`,
+    [CLIENT]
   );
-  console.log('\nCurrent settings:', s.rows[0]);
+  const cfg = s.rows[0];
+  console.log('\n=== Marquis Farwell Homes — Campaign Status ===');
+  console.log('SELLER:', cfg.seller_paused ? 'PAUSED' : 'ON  <-- active');
+  console.log('  sender:', cfg.seller_sender_email || cfg.send_from_email);
+  console.log('  cc:    ', cfg.cc_email || '(none)');
+  console.log('  window:', cfg.send_window_start, '-', cfg.send_window_end, cfg.timezone);
+  console.log('BUYER: ', cfg.buyer_paused ? 'PAUSED <-- blocked' : 'ON');
+  console.log('  sender:', cfg.buyer_sender_email || cfg.send_from_email || '(none)');
+
+  const users = await query(
+    'SELECT email, google_scope, google_refresh_token_encrypted IS NOT NULL as connected FROM users WHERE client_id = $1',
+    [CLIENT]
+  );
+  console.log('\nTeam:');
+  users.rows.forEach(u => {
+    const hasGmail = (u.google_scope || '').includes('gmail');
+    console.log(' ', u.connected ? '[connected]' : '[NO TOKEN] ', u.email, hasGmail ? '(gmail.send OK)' : '(NO gmail scope)');
+  });
 
   process.exit(0);
 }

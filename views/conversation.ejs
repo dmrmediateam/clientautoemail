@@ -213,7 +213,7 @@
               <div class="bubble-row <%= m.direction %>">
                 <div class="bubble-meta">
                   <% if (isOut) { %>
-                    <strong>You</strong> &rarr; <%= m.to_email %> &middot; <%= ts %>
+                    <strong><%= m.from_email || (client.google && client.google.email) || 'You' %></strong> &rarr; <%= m.to_email %> &middot; <%= ts %>
                   <% } else { %>
                     <strong><%= fromLabel %></strong> &rarr; You &middot; <%= ts %>
                   <% } %>

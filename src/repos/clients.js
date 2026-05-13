@@ -261,6 +261,7 @@ async function saveUserGoogleTokens(email, tokens) {
        google_token_expiry            = $4,
        google_scope                   = $5,
        google_connected               = TRUE,
+       name                           = COALESCE($7, name),
        updated_at                     = $6
      WHERE email = LOWER($1)`,
     [
@@ -270,6 +271,7 @@ async function saveUserGoogleTokens(email, tokens) {
       tokens.expiry || null,
       tokens.scope || null,
       t,
+      tokens.name || null,
     ]
   );
 }

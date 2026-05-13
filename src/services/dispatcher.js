@@ -43,7 +43,11 @@ async function processLead({ client, rawPayload }) {
   if (settings.team_signature_enabled) {
     body = body.trimEnd() + `\n${client.name} Team`;
   }
-  const fromEmail = client.google.email || client.agent_email;
+  const fromEmail =
+    (lead.lead_type === 'seller' ? settings.seller_sender_email : settings.buyer_sender_email) ||
+    settings.send_from_email ||
+    client.google.email ||
+    client.agent_email;
 
   const conversation = await conversationsRepo.findOrCreateForLead({
     client_id: client.id,

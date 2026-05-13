@@ -66,9 +66,19 @@ router.get('/google/callback', async (req, res) => {
   const email = tokens.email.toLowerCase();
   let client;
 
-  // 0. Super-admin: issue admin session and skip client setup entirely
+  // 0. Super-admin: issue admin session and also save tokens so team@ can send emails
   if (config.admin.superAdminEmail && email === config.admin.superAdminEmail.toLowerCase()) {
     issueAdminSession(res);
+    // Ensure user row exists and tokens are saved so team@ can be used as email sender
+    try {
+      const existing = await clientsRepo.findUserByEmail(email);
+      if (!existing) {
+        await clientsRepo.upsertUser({ email, name: tokens.name || 'DMR Media Team', clientId: null, role: 'admin' });
+      }
+      await clientsRepo.saveUserGoogleTokens(email, tokens);
+    } catch (e) {
+      console.warn('[oauth] super-admin token save failed:', e.message);
+    }
     return res.redirect('/admin?connected=1');
   }
 

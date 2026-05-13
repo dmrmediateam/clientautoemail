@@ -3,7 +3,7 @@ require('dotenv').config();
 const { query } = require('../src/db');
 
 const CLIENT_ID = 'ae5ebc7b-3ea3-45de-a0a6-98066037d937';
-const SENDER    = 'samanthamarquishomes@gmail.com';
+const SENDER    = 'samantha.marquis@compass.com';
 
 async function run() {
   // 1. Set send_from_email to Samantha's connected Gmail
