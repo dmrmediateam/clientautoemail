@@ -95,12 +95,6 @@ router.post('/send-queued', async (req, res) => {
 router.post('/daily-report', async (req, res) => {
   if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
-  // Skip weekends (UTC — Vercel cron fires at 13:00 UTC = 8 AM ET)
-  const day = new Date().getUTCDay(); // 0=Sun, 6=Sat
-  if (day === 0 || day === 6) {
-    return res.json({ ok: true, skipped: 'weekend' });
-  }
-
   try {
     const since24h = Date.now() - 24 * 60 * 60 * 1000;
 

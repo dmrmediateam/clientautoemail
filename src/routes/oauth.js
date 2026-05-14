@@ -71,10 +71,7 @@ router.get('/google/callback', async (req, res) => {
     issueAdminSession(res);
     // Ensure user row exists and tokens are saved so team@ can be used as email sender
     try {
-      const existing = await clientsRepo.findUserByEmail(email);
-      if (!existing) {
-        await clientsRepo.upsertUser({ email, name: tokens.name || 'DMR Media Team', clientId: null, role: 'admin' });
-      }
+      await clientsRepo.upsertAdminUser({ email, name: tokens.name || 'DMR Media Team' });
       await clientsRepo.saveUserGoogleTokens(email, tokens);
     } catch (e) {
       console.warn('[oauth] super-admin token save failed:', e.message);

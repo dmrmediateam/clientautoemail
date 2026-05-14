@@ -89,11 +89,12 @@ CREATE TABLE IF NOT EXISTS leads (
 -- Multi-user: maps individual Google accounts to a client account.
 -- role = 'owner'  → connects Gmail for sending, sees dashboard
 -- role = 'member' → dashboard access only, does not overwrite sending credentials
+-- role = 'admin'  → super-admin (team@), client_id is NULL
 CREATE TABLE IF NOT EXISTS users (
   id           TEXT PRIMARY KEY,
   email        TEXT UNIQUE NOT NULL,   -- stored lowercase
   name         TEXT,
-  client_id    TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  client_id    TEXT REFERENCES clients(id) ON DELETE CASCADE,  -- NULL for admin users
   role         TEXT NOT NULL DEFAULT 'member',
   created_at   BIGINT NOT NULL,
   updated_at   BIGINT NOT NULL

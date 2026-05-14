@@ -251,6 +251,20 @@ async function upsertUser({ email, name, clientId, role }) {
   return r.rows[0];
 }
 
+// Admin users (team@) have no client_id — separate upsert that allows NULL
+async function upsertAdminUser({ email, name }) {
+  const t = now();
+  const r = await query(
+    `INSERT INTO users (id, email, name, client_id, role, created_at, updated_at)
+     VALUES (gen_random_uuid()::text, LOWER($1), $2, NULL, 'admin', $3, $3)
+     ON CONFLICT (email)
+     DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name), updated_at = $3
+     RETURNING *`,
+    [email, name || null, t]
+  );
+  return r.rows[0];
+}
+
 // Save Google tokens to a user row (for multi-sender support)
 async function saveUserGoogleTokens(email, tokens) {
   const t = now();
@@ -344,6 +358,7 @@ module.exports = {
   findByGoogleEmail,
   findUserByEmail,
   upsertUser,
+  upsertAdminUser,
   saveUserGoogleTokens,
   clearUserGoogleTokens,
   listUsersForClient,
