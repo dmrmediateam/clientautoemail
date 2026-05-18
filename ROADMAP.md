@@ -1,10 +1,192 @@
-# Roadmap
+# Roadmap — DMR Lead Engine
 
-Living document. Phases ship in order; "later" items are deliberate non-goals for v1.
+> The ultimate personal-email automation platform. Think Google Ads campaign management — but powered by each agent's own Gmail inbox.
+
+Living document. Phases ship in order. Append decisions to the log at the bottom.
 
 ---
 
-## Phase 0 — Scaffolding ✅
+## ✅ v1.0 — Foundation  *(shipped May 18 2026)*
+
+Everything needed to run a live, multi-client email automation service.
+
+**Core infrastructure**
+- [x] Multi-tenant webhook ingestion (`/v1/webhooks/incoming/:client_uuid`)
+- [x] Lead normalizer — loose field-name matching, works with any CRM/LP format
+- [x] AES-256-GCM token encryption for stored OAuth refresh tokens
+- [x] PostgreSQL schema (`clients`, `client_settings`, `conversations`, `messages`, `webhook_payloads`)
+- [x] Vercel cron every 15 min — send queued messages via `/api/cron/send-queued`
+- [x] Gmail API direct send — email goes from agent's own inbox, Google-signed DKIM
+- [x] Gmail Push (Pub/Sub) — inbound replies tracked in real time
+- [x] Smart send window — business-hours scheduling per client timezone
+- [x] Self-serve onboarding — agent clicks "Sign in with Google", account auto-provisions
+
+**Client dashboard**
+- [x] Webhook URL with copy-to-clipboard
+- [x] Editable template (subject + body with `{{placeholder}}` variables)
+- [x] Left-hand sidebar nav — Dashboard / Campaigns / Templates
+- [x] Campaigns page — seller & buyer cards, live status badges, leads/sent stats
+- [x] Campaign toggle switches — pause or activate seller/buyer campaigns instantly
+- [x] Send window + timezone display on campaign cards
+- [x] Conversation thread view — full message history per lead
+- [x] Prior contact history — collapsible panel showing earlier threads with the same email
+
+**Admin panel**
+- [x] Client list + impersonation ("view as client")
+- [x] Conversation browser across all clients
+- [x] "Send Now" button — manually fire a queued/stuck message immediately
+- [x] Cron bug fixed: Vercel sends GET, route was POST-only (nothing ever sent until fix)
+
+---
+
+## v1.1 — Analytics & Visibility  *(next)*
+
+Agents want to know: "Is this working?" Give them real numbers.
+
+- [ ] **Open tracking** — 1×1 pixel served from our domain, log `opened_at` on `messages`
+- [ ] **Click tracking** — rewrite links through a redirect, log click events
+- [ ] **Reply rate** — already tracked via Gmail Push; surface as % on Campaigns page
+- [ ] **Dashboard stats cards** — "X leads · Y sent · Z replies · W opens" at a glance
+- [ ] **Per-campaign stats** — open rate %, reply rate % on each campaign card
+- [ ] **Admin aggregate view** — all clients: total emails / opens / replies, filterable by date
+- [ ] **Daily digest to agent** — "Yesterday: 3 new leads, 3 sent, 1 reply" (opt-in)
+- [ ] **CSV export** — download leads + message history per client
+
+---
+
+## v1.2 — Drip Sequences  *(campaign depth)*
+
+One email is a start. A timed sequence is a funnel — just like a Google Ads retargeting flow, but through their inbox.
+
+- [ ] **Sequence builder** — N follow-up steps, each with a template + delay ("send 3 days after step 1 if no reply")
+- [ ] **Reply = stop sequence** — lead replies at any step → remaining steps cancelled automatically
+- [ ] **Pre-built sequence templates** — Seller 5-step, Buyer 3-step, Luxury 7-step — clients clone & customize
+- [ ] **Unsubscribe handling** — detect "unsubscribe" reply, flag lead as opted-out, suppress future steps
+- [ ] **Multi-step threads** — follow-up messages appear in the same conversation thread in the dashboard
+- [ ] **Per-sequence pause** — pause one sequence without affecting others
+
+---
+
+## v1.3 — AI Personalization  *(feel human, scale infinitely)*
+
+The email shouldn't feel like a template. It should feel like the agent wrote it themselves.
+
+- [ ] **AI subject line generator** — 3 subject variants based on lead data (location, price range, type)
+- [ ] **Smart body personalization** — AI fills in specific details from the lead payload (neighborhood, beds/baths, price)
+- [ ] **Tone selector** — Professional / Friendly / Luxury — client picks tone, AI adjusts
+- [ ] **Preview before send** — "Here's what this email looks like for this specific lead"
+- [ ] **A/B testing** — 50/50 split on subject or body; track open/reply rates per variant
+- [ ] **AI reply suggestions** — when a lead replies, show agent 2–3 suggested responses (one click to send — agent stays in control)
+
+---
+
+## v2.0 — Calendar → Google Ads Conversion Tracking  *(close the ROI loop)*
+
+When a lead books an appointment in the agent's Google Calendar, upload it as an offline conversion to Google Ads. Now the agent knows exactly which ad spend drove appointments.
+
+- [ ] Calendar polling — `calendar.readonly`, list events updated since last poll per connected client
+- [ ] `calendar_events` table — dedupe by `iCalUID`, link to `conversations.lead_email`
+- [ ] Capture GCLID from original lead webhook, store on `conversations`
+- [ ] Google Ads API — developer token, per-client customer ID + conversion action resource name
+- [ ] `ConversionUploadService.UploadClickConversions` — daily cron upload
+- [ ] Conversions tab on dashboard — Lead → Email → Appointment → Ads upload ✓
+- [ ] Backfill past calendar events once the pipe is built
+
+---
+
+## v2.1 — Multi-Campaign Architecture  *(full campaign manager)*
+
+Right now clients have 2 campaigns (seller, buyer). Expand to unlimited — just like Google Ads campaign groups.
+
+- [ ] **`campaigns` table** — `id`, `client_id`, `name`, `lead_type`, `paused`, `sequence_id`, `sender_id`, `send_window_*`
+- [ ] **Campaign builder UI** — name it, pick lead type/tag, assign sequence, assign sender, set window
+- [ ] **Tag-based routing** — route leads to campaigns based on payload fields (`lead_type=luxury` → Luxury Sellers campaign)
+- [ ] **Multiple senders per client** — different team members on different campaigns
+- [ ] **Campaign-level send windows** — luxury leads get 9AM–5PM; investor leads get extended hours
+- [ ] **Side-by-side campaign performance** — leads / sent / open rate / reply rate / conversions per campaign
+
+---
+
+## v2.5 — Monetization & Operator Growth
+
+- [ ] **Stripe billing** — per-client monthly subscription, tiered by active campaigns + lead volume
+- [ ] **Plan limits** — Free: 1 campaign / 50 leads/mo · Pro: unlimited campaigns / unlimited leads
+- [ ] **Usage dashboard** — admin sees email volume per client, approaching-limit alerts
+- [ ] **White-label for brokerages** — brokerage logo on agent dashboards; all agents under one account
+- [ ] **Brokerage admin** — broker can see all agents' campaigns, pause any agent, review templates
+- [ ] **Referral codes** — agents refer agents, earn credit
+
+---
+
+## v3.0 — Self-Serve Platform  *(beyond real estate)*
+
+The platform becomes general-purpose. Any business that gets leads via webhook can use it.
+
+- [ ] **Industry template packs** — Real Estate, Mortgage, Insurance, Auto — pre-built sequences per vertical
+- [ ] **Visual field mapper** — drag-and-drop any webhook field to a template variable
+- [ ] **Zapier / Make.com connector** — receive leads from any source, not just Luxury Presence
+- [ ] **Multi-inbox / round-robin** — connect multiple Gmail accounts to one campaign, distribute sends across team
+- [ ] **Team seats + roles** — invite members (admin / editor / viewer)
+- [ ] **Public API** — documented REST so partners integrate directly
+- [ ] **Self-serve setup wizard** — connect Gmail → build first campaign → paste webhook URL → done in 5 minutes
+
+---
+
+## v3.5 — Multi-Channel  *(when email isn't enough)*
+
+- [ ] **SMS follow-up** — Twilio as an optional step in any sequence (after email, send SMS)
+- [ ] **TCPA compliance gate** — require explicit opt-in before any SMS step goes live
+- [ ] **WhatsApp Business API** — international clients, high-touch luxury market
+- [ ] **Voicemail drop** — optional sequence step (pre-recorded, no ring)
+
+---
+
+## Google OAuth Verification  *(parallel track)*
+
+Required to lift 7-day token expiry and onboard > 100 users.
+
+- [ ] Verify `dmrmedia.org` in Google Search Console
+- [ ] Complete OAuth consent screen — logo, support email, homepage URL
+- [ ] Record YouTube demo (onboarding → dashboard → test send → email received)
+- [ ] Submit brand verification → "In production" status (lifts 7-day limit)
+- [ ] Restricted scope + CASA Tier 2 — defer until approaching 100 active users. Budget: 6–12 weeks + $15K–$75K.
+
+---
+
+## Deliberate non-goals (for now)
+
+- **HTML email editor** — plain text outperforms HTML for cold lead follow-up. Revisit if clients ask.
+- **Calendar write access** — `calendar.readonly` is sufficient and easier to verify with Google.
+- **Built-in CRM** — we are the automation layer on top of existing CRMs, not a replacement.
+
+---
+
+## Decision Log
+
+Append-only. Newest at top.
+
+### 2026-05-18 — v1.0 shipped, roadmap reformatted as campaign platform
+- Reframed vision: "Google Ads campaign management for personal email" — multiple campaigns, drip sequences, analytics, A/B testing, conversion tracking.
+- Marked all Phase 0 / Phase 1 / Phase 1.5 work as complete.
+- Non-goals updated: A/B testing and AI personalization promoted to v1.3 (previously "never").
+
+### 2026-05-18 — Cron bug fixed (GET vs POST)
+- Vercel cron sends GET requests. Route was POST-only. Nothing had ever been sent by the cron since launch.
+- Fix: added `router.get('/send-queued')` alongside existing POST. Extracted `sendOneMessage()` helper.
+- Two stuck messages for Marquis Farwell manually fired via new admin "Send Now" button.
+
+### 2026-05-04 — Migrated SQLite → Postgres
+- SQLite via `better-sqlite3` incompatible with Vercel serverless. Switched to Postgres via `pg` driver.
+
+### 2026-05-04 — Ship email-only, calendar/Ads in Phase 2
+- Calendar + Ads blocked launch by weeks. Deploy email now. Add `calendar.readonly` to initial OAuth scope so no re-prompt later. Conversions backfill retroactively.
+
+### 2026-04-30 — Self-serve onboarding
+- Changed from operator-managed to public `/onboarding`. Sales motion = "send them a link."
+
+### 2026-04-30 — Gmail API direct send, drop SendGrid
+- Gmail's DMARC `p=reject` blocks third-party SMTP from sending as `@gmail.com`. Switched to Gmail API per-agent OAuth. Email arrives from agent's own inbox, Google-signed DKIM. Rate limit: 500–2000/day per account (acceptable for lead volume).
+
 
 - [x] Project structure, package.json, env loader
 - [x] SQLite schema + migrations
@@ -18,7 +200,32 @@ Living document. Phases ship in order; "later" items are deliberate non-goals fo
 
 ---
 
-## Phase 1 — Self-serve onboarding + Gmail API send ✅
+## Decision Log
+
+Append-only. Newest at top.
+
+### 2026-05-18 — v1.0 shipped, roadmap reformatted as campaign platform
+- Reframed vision: "Google Ads campaign management for personal email" — multiple campaigns, drip sequences, analytics, A/B testing, conversion tracking.
+- Marked all Phase 0 / Phase 1 / Phase 1.5 work complete. Removed old phase numbering, replaced with version-based milestones.
+- Non-goals updated: A/B testing and AI personalization promoted to v1.3 roadmap items.
+
+### 2026-05-18 — Cron bug fixed (GET vs POST)
+- Vercel cron sends GET requests. Route was POST-only since launch — nothing had ever been sent by the cron.
+- Fix: added `router.get('/send-queued')` alongside existing POST. Extracted `sendOneMessage()` helper.
+- Two stuck messages for Marquis Farwell (Betty Millman, Judith Chigi) manually fired via new admin "Send Now" button.
+
+### 2026-05-04 — Migrated SQLite → Postgres (Vercel)
+- SQLite via `better-sqlite3` incompatible with Vercel serverless (no persistent local disk). Switched to Postgres via `pg` driver with `DATABASE_URL`.
+
+### 2026-05-04 — Ship email-only, calendar/Ads in Phase 2
+- Calendar polling + Google Ads conversion upload would block launch by weeks. Decision: deploy email automation now. Add `calendar.readonly` to initial OAuth scope so no re-prompt when Phase 2 ships. Conversions can be backfilled retroactively.
+
+### 2026-04-30 — Self-serve onboarding
+- Changed from operator-managed onboarding to public `/onboarding` page. Agent clicks "Sign in with Google", account auto-provisions. Sales motion = "send them a link."
+
+### 2026-04-30 — Gmail API direct send, drop SendGrid
+- Gmail's DMARC `p=reject` blocks third-party SMTP from sending as `@gmail.com`. Switched to Gmail API per-agent OAuth token. Email arrives from agent's own inbox, Google-signed DKIM, lands in Sent folder. Rate limit: ~500/day free, ~2000/day Workspace (acceptable for lead follow-up volume).
+
 
 The pivot from operator-managed to self-serve. Each agent signs themselves up and gets an automation dashboard.
 
