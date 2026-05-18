@@ -188,6 +188,33 @@
             <span class="cpill" title="Coming soon">SMS</span>
           </div>
         </div>
+
+        <div style="padding:12px 16px;border-top:1px solid var(--border)">
+          <div class="channel-row-label" style="margin-bottom:10px">Email history</div>
+          <% if (typeof priorHistory === 'undefined' || !priorHistory.length) { %>
+            <div style="font-size:12px;color:var(--fg-muted);font-style:italic">No history</div>
+          <% } else { %>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <% priorHistory.forEach(function(prior) {
+                const sentC = prior.sent_count || 0;
+                const totalC = prior.message_count || 0;
+                const priorDateShort = new Date(Number(prior.created_at)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+              %>
+              <a href="/dashboard/conversations/<%= prior.id %>" style="display:block;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);text-decoration:none;color:inherit">
+                <div style="font-size:12px;font-weight:600;color:var(--fg);margin-bottom:2px"><%= priorDateShort %></div>
+                <div style="font-size:11px;color:var(--fg-muted)"><%= prior.source || 'direct' %></div>
+                <div style="margin-top:4px">
+                  <% if (sentC > 0) { %>
+                    <span style="font-size:11px;color:#16a34a;font-weight:600">&#10003; <%= sentC %> sent</span>
+                  <% } else { %>
+                    <span style="font-size:11px;color:var(--fg-muted)"><%= totalC %> msg<%= totalC !== 1 ? 's' : '' %>, none sent</span>
+                  <% } %>
+                </div>
+              </a>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
       </aside>
 
       <!-- Thread + reply -->

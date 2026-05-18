@@ -104,8 +104,15 @@ router.post('/send-queued', async (req, res) => {
 });
 
 // ── Daily admin status report ─────────────────────────────────────────────────
-router.post('/daily-report', async (req, res) => {
-  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+// Vercel cron sends GET; keep POST for manual triggers
+async function runDailyReport(res) {
+  // Skip weekends (Sat=6, Sun=0) in ET
+  const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const dow = nowET.getDay();
+  if (dow === 0 || dow === 6) {
+    console.log('[cron/daily-report] skipping — weekend');
+    return res.json({ ok: true, skipped: true, reason: 'weekend' });
+  }
 
   try {
     const since24h = Date.now() - 24 * 60 * 60 * 1000;
@@ -191,11 +198,21 @@ router.post('/daily-report', async (req, res) => {
     });
 
     console.log(`[cron/daily-report] sent — sent=${sent} failed=${failed} queued=${queued}`);
-    res.json({ ok: true, sent, failed, queued, pending });
+    return res.json({ ok: true, sent, failed, queued, pending });
   } catch (err) {
     console.error('[cron/daily-report] error:', err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    return res.status(500).json({ ok: false, error: err.message });
   }
+}
+
+router.get('/daily-report', async (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  return runDailyReport(res);
+});
+
+router.post('/daily-report', async (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  return runDailyReport(res);
 });
 
 module.exports = router;

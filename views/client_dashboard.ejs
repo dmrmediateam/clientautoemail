@@ -66,6 +66,7 @@
   .tab-content.active { display:block; }
   .msg-row { display:grid; grid-template-columns:1fr auto auto; gap:8px 16px; padding:12px 0; border-bottom:1px solid var(--border); align-items:center; }
   .msg-row:last-child { border-bottom:0; }
+  a.msg-row:hover { background:var(--surface-2); margin:0 -20px; padding:12px 20px; }
   .msg-to   { font-size:13px; font-weight:500; }
   .msg-sub  { font-size:12px; color:var(--fg-muted); margin-top:2px; }
   .msg-time { font-size:11px; color:var(--fg-muted); font-family:var(--mono); white-space:nowrap; text-align:right; }
@@ -263,14 +264,14 @@
               const d2 = new Date(ts2).toLocaleDateString('en-US',{month:'short',day:'numeric'});
               const t2 = new Date(ts2).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
             %>
-            <div class="msg-row">
+            <a class="msg-row" href="/dashboard/conversations/<%= m.conversation_id %>" style="text-decoration:none;color:inherit;display:grid;grid-template-columns:1fr auto auto">
               <div>
                 <div class="msg-to">To: <%= m.to_email %></div>
                 <div class="msg-sub"><%= m.subject %></div>
               </div>
               <span class="badge <%= sc2 %>"><%= m.status %></span>
               <div class="msg-time"><%= d2 %><br><%= t2 %></div>
-            </div>
+            </a>
             <% }) %>
           <% } %>
         </div>
