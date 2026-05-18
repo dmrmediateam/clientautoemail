@@ -1,0 +1,36 @@
+<%
+  const _sidebarPage    = typeof page !== 'undefined' ? page : '';
+  const _sidebarClient  = typeof client !== 'undefined' ? client : {};
+  const _sidebarAdmin   = typeof isAdminImpersonating !== 'undefined' && isAdminImpersonating;
+  const _sellerActive   = !(_sidebarClient.settings && _sidebarClient.settings.seller_paused);
+  const _buyerActive    = !(_sidebarClient.settings && _sidebarClient.settings.buyer_paused);
+%>
+<aside class="dash-sidebar">
+  <div class="snav-client">
+    <div class="sc-name"><%= _sidebarClient.name || '' %></div>
+    <div class="sc-email"><%= (_sidebarClient.google && _sidebarClient.google.email) || _sidebarClient.agent_email || '' %></div>
+  </div>
+
+  <div class="snav-group">
+    <a href="/dashboard" class="snav-item <%= _sidebarPage === 'dashboard' ? 'active' : '' %>">
+      <span class="snav-icon">&#9632;</span> Dashboard
+    </a>
+    <a href="/dashboard/campaigns" class="snav-item <%= _sidebarPage === 'campaigns' ? 'active' : '' %>">
+      <span class="snav-icon">&#9654;</span> Campaigns
+      <% if (_sellerActive || _buyerActive) { %>
+        <span class="badge badge-on" style="font-size:9px;padding:1px 6px;margin-left:auto"><%= [_sellerActive ? 'S' : '', _buyerActive ? 'B' : ''].filter(Boolean).join('+') %></span>
+      <% } %>
+    </a>
+    <a href="/dashboard/template" class="snav-item <%= _sidebarPage === 'template' ? 'active' : '' %>">
+      <span class="snav-icon">&#9998;</span> Templates
+    </a>
+  </div>
+
+  <% if (_sidebarAdmin) { %>
+  <div style="padding:12px 8px;margin-top:auto;border-top:1px solid var(--border);position:absolute;bottom:0;width:100%;background:var(--surface)">
+    <form action="/admin/stop-impersonating" method="post">
+      <button class="btn" type="submit" style="width:100%;justify-content:center;background:#F59E0B;color:#000;border-color:#F59E0B;font-size:12px;padding:7px 12px">&#8592; Admin Panel</button>
+    </form>
+  </div>
+  <% } %>
+</aside>

@@ -22,6 +22,7 @@ function flashFromQuery(req) {
   if (q.replied) return { type: 'success', text: 'Reply queued and ready to send.' };
   if (q.approved) return { type: 'success', text: `Approved — ${q.approved} message${q.approved > 1 ? 's' : ''} queued for sending.` };
   if (q.sent) return { type: 'success', text: 'Email sent successfully.' };
+  if (q.saved && q.msg) return { type: 'success', text: q.msg };
   return null;
 }
 
@@ -49,6 +50,46 @@ router.get('/', async (req, res, next) => {
       }),
       flash: flashFromQuery(req),
     });
+  } catch (err) { next(err); }
+});
+
+router.get('/campaigns', async (req, res, next) => {
+  try {
+    const { query } = require('../db');
+    const r = await query(
+      `SELECT
+         SUM(CASE WHEN c.lead_type = 'seller' THEN 1 ELSE 0 END)::int AS seller_leads,
+         SUM(CASE WHEN c.lead_type = 'buyer'  THEN 1 ELSE 0 END)::int AS buyer_leads,
+         SUM(CASE WHEN c.lead_type = 'seller' AND m.status = 'sent' THEN 1 ELSE 0 END)::int AS seller_sent,
+         SUM(CASE WHEN c.lead_type = 'buyer'  AND m.status = 'sent' THEN 1 ELSE 0 END)::int AS buyer_sent
+       FROM conversations c
+       LEFT JOIN messages m ON m.conversation_id = c.id AND m.direction = 'outbound'
+       WHERE c.client_id = $1`,
+      [req.client.id]
+    );
+    const stats = r.rows[0] || {};
+    res.render('campaigns', {
+      brand: config.brand,
+      publicBaseUrl: config.publicBaseUrl,
+      client: req.client,
+      isAdminImpersonating: req.isAdminImpersonating || false,
+      stats,
+      page: 'campaigns',
+      flash: flashFromQuery(req),
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/campaigns/:type/toggle', async (req, res, next) => {
+  try {
+    const type = req.params.type;
+    if (type !== 'seller' && type !== 'buyer') return res.status(400).send('Invalid campaign type');
+    const current = req.client.settings || {};
+    const pauseKey = type === 'seller' ? 'seller_paused' : 'buyer_paused';
+    const nowPaused = !!current[pauseKey];
+    await clientsRepo.update(req.client.id, { [pauseKey]: !nowPaused });
+    const action = nowPaused ? 'activated' : 'paused';
+    res.redirect(`/dashboard/campaigns?saved=1&msg=${encodeURIComponent(`${type.charAt(0).toUpperCase() + type.slice(1)} campaign ${action}.`)}`);
   } catch (err) { next(err); }
 });
 

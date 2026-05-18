@@ -22,7 +22,8 @@
     </div>
     <nav class="nav">
       <a href="/dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>">Dashboard</a>
-      <a href="/dashboard/template" class="<%= page === 'template' ? 'active' : '' %>">Template</a>
+      <a href="/dashboard/campaigns" class="<%= page === 'campaigns' ? 'active' : '' %>">Campaigns</a>
+      <a href="/dashboard/template" class="<%= page === 'template' ? 'active' : '' %>">Templates</a>
       <span style="color:var(--fg-muted);font-size:12px;margin:0 6px"><%= client.google.email || client.agent_email %></span>
       <% if (typeof isAdminImpersonating !== 'undefined' && isAdminImpersonating) { %>
         <form action="/admin/stop-impersonating" method="post" style="display:inline;margin-left:6px">

@@ -82,27 +82,21 @@
       </div>
     </div>
     <nav class="nav">
-      <a href="/dashboard" class="active">Dashboard</a>
-      <a href="/dashboard/template">Template</a>
       <span style="color:var(--fg-muted);font-size:12px;padding:0 6px">
         <% var _me = currentUser ? currentUser.email : (client.google.email || client.agent_email); %>
         <%= _me %>
         <span style="margin-left:4px;opacity:.5">·</span>
         <span style="color:var(--accent);font-weight:600"><%= client.name %></span>
       </span>
-      <% if (typeof isAdminImpersonating !== 'undefined' && isAdminImpersonating) { %>
-        <form action="/admin/stop-impersonating" method="post" style="display:inline;margin-left:6px">
-          <button class="btn" type="submit" style="background:#F59E0B;color:#000;border-color:#F59E0B">← Admin Panel</button>
-        </form>
-      <% } else { %>
-        <form action="/auth/logout" method="post" style="display:inline">
-          <button class="btn btn-ghost" type="submit">Sign out</button>
-        </form>
-      <% } %>
+      <form action="/auth/logout" method="post" style="display:inline">
+        <button class="btn btn-ghost" type="submit">Sign out</button>
+      </form>
     </nav>
   </header>
 
-  <main class="main">
+  <div class="dash-body">
+  <%- include('_dash_sidebar', { page, client, isAdminImpersonating: isAdminImpersonating || false }) %>
+  <main class="dash-content"><div class="dash-content-inner">
     <% if (typeof flash !== 'undefined' && flash) { %>
       <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>
     <% } %>
@@ -347,7 +341,8 @@
       </div>
     </div>
 
-  </main>
+  </div></main>
+  </div><!-- /.dash-body -->
 
   <footer class="foot">
     <span>&copy; <%= new Date().getFullYear() %> <%= brand.name %></span>
