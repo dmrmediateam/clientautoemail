@@ -155,6 +155,13 @@ async function findByGmailMessageId(gmailMessageId) {
   return r.rows[0] ? rowOut(r.rows[0]) : null;
 }
 
+async function reschedule(id, scheduledFor) {
+  await query(
+    `UPDATE messages SET scheduled_for = $1 WHERE id = $2`,
+    [scheduledFor, id]
+  );
+}
+
 module.exports = {
   create,
   markSent,
@@ -164,6 +171,8 @@ module.exports = {
   listForConversation,
   listRecentByClient,
   getById,
+  findById: getById,
   findByGmailMessageId,
   approvePending,
+  reschedule,
 };

@@ -178,6 +178,7 @@ async function listAll({ clientId, limit = 200, offset = 0, leadType, search } =
     `SELECT c.*,
             cl.name AS client_name,
             COUNT(m.id)::int AS message_count,
+            SUM(CASE WHEN m.status = 'sent' THEN 1 ELSE 0 END)::int AS sent_count,
             lm.subject AS last_subject,
             lm.status  AS last_status,
             lm.created_at AS last_message_ts
@@ -199,6 +200,26 @@ async function listAll({ clientId, limit = 200, offset = 0, leadType, search } =
   return r.rows.map(rowOut);
 }
 
+// All prior conversations with the same lead email for the same client,
+// excluding the current conversation, ordered oldest→newest.
+async function listPriorForLead(clientId, leadEmail, excludeConvId) {
+  if (!leadEmail) return [];
+  const r = await query(
+    `SELECT c.*,
+            COUNT(m.id)::int AS message_count,
+            SUM(CASE WHEN m.status = 'sent' THEN 1 ELSE 0 END)::int AS sent_count
+     FROM conversations c
+     LEFT JOIN messages m ON m.conversation_id = c.id
+     WHERE c.client_id = $1
+       AND LOWER(c.lead_email) = LOWER($2)
+       AND c.id <> $3
+     GROUP BY c.id
+     ORDER BY c.created_at ASC`,
+    [clientId, leadEmail, excludeConvId]
+  );
+  return r.rows.map(rowOut);
+}
+
 module.exports = {
   findById,
   findByClientAndThread,
@@ -209,4 +230,5 @@ module.exports = {
   listWithPreview,
   listAll,
   updateThreadId,
+  listPriorForLead,
 };

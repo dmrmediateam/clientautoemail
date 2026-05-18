@@ -5,7 +5,9 @@ const config = require('../config');
 const clientsRepo = require('../repos/clients');
 const leadsRepo = require('../repos/leads');
 const conversationsRepo = require('../repos/conversations');
+const messagesRepo = require('../repos/messages');
 const dispatcher = require('../services/dispatcher');
+const { sendOneMessage } = require('./cron');
 const { issueClientSession, clearClientSession } = require('../middleware/auth');
 
 const router = express.Router();
@@ -282,6 +284,25 @@ router.post('/clients/:id/impersonate', async (req, res, next) => {
 router.post('/stop-impersonating', (req, res) => {
   clearClientSession(res);
   res.redirect('/admin');
+});
+
+// Send a specific queued message immediately (admin-only)
+router.post('/messages/:id/send-now', async (req, res, next) => {
+  try {
+    const msg = await messagesRepo.findById(Number(req.params.id));
+    if (!msg) return res.status(404).json({ ok: false, error: 'Message not found' });
+    if (!['queued', 'rate_limited', 'pending'].includes(msg.status)) {
+      return res.status(400).json({ ok: false, error: `Cannot send message with status "${msg.status}"` });
+    }
+    // Reset scheduled_for so dueQueued / sendOneMessage picks it up immediately
+    await messagesRepo.reschedule(msg.id, Date.now());
+    const updated = await messagesRepo.findById(msg.id);
+    await sendOneMessage(updated);
+    // Redirect back to the conversation in admin view
+    const conv = await conversationsRepo.findById(msg.conversation_id);
+    const backUrl = conv ? `/admin/conversations/${conv.id}` : '/admin/leads';
+    res.redirect(`${backUrl}?sent=1`);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

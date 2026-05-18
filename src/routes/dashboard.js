@@ -21,6 +21,7 @@ function flashFromQuery(req) {
   if (q.resumed) return { type: 'success', text: 'Bridge resumed.' };
   if (q.replied) return { type: 'success', text: 'Reply queued and ready to send.' };
   if (q.approved) return { type: 'success', text: `Approved — ${q.approved} message${q.approved > 1 ? 's' : ''} queued for sending.` };
+  if (q.sent) return { type: 'success', text: 'Email sent successfully.' };
   return null;
 }
 
@@ -150,7 +151,17 @@ router.get('/conversations/:id', async (req, res, next) => {
     if (!conversation || conversation.client_id !== req.client.id) {
       return res.status(404).send('Conversation not found');
     }
-    const messages = await messagesRepo.listForConversation(conversation.id);
+    const [messages, priorConvs] = await Promise.all([
+      messagesRepo.listForConversation(conversation.id),
+      conversationsRepo.listPriorForLead(req.client.id, conversation.lead_email, conversation.id),
+    ]);
+    // Attach messages to each prior conversation
+    const priorHistory = await Promise.all(
+      priorConvs.map(async (c) => ({
+        ...c,
+        messages: await messagesRepo.listForConversation(c.id),
+      }))
+    );
     res.render('conversation', {
       brand: config.brand,
       publicBaseUrl: config.publicBaseUrl,
@@ -158,6 +169,7 @@ router.get('/conversations/:id', async (req, res, next) => {
       isAdminImpersonating: req.isAdminImpersonating || false,
       conversation,
       messages,
+      priorHistory,
       page: 'dashboard',
       flash: flashFromQuery(req),
     });
