@@ -95,7 +95,7 @@
   </header>
 
   <div class="dash-body">
-  <%- include('_dash_sidebar', { page, client, isAdminImpersonating: isAdminImpersonating || false }) %>
+  <%- sidebarHtml %>
   <main class="dash-content"><div class="dash-content-inner">
     <% if (typeof flash !== 'undefined' && flash) { %>
       <div class="flash flash-<%= flash.type %>"><%= flash.text %></div>

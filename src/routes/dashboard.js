@@ -1,5 +1,7 @@
 'use strict';
 
+const path = require('path');
+const ejs = require('ejs');
 const express = require('express');
 const config = require('../config');
 const clientsRepo = require('../repos/clients');
@@ -8,6 +10,15 @@ const messagesRepo = require('../repos/messages');
 const dispatcher = require('../services/dispatcher');
 const google = require('../services/google');
 const { nextWindowStart } = require('../services/scheduler');
+
+const VIEWS_DIR = path.join(__dirname, '../../views');
+
+async function sidebarHtml(page, client, isAdminImpersonating) {
+  return ejs.renderFile(
+    path.join(VIEWS_DIR, '_dash_sidebar.ejs'),
+    { page, client, isAdminImpersonating: !!isAdminImpersonating }
+  );
+}
 
 const router = express.Router();
 
@@ -33,10 +44,12 @@ router.get('/', async (req, res, next) => {
       messagesRepo.listRecentByClient(req.client.id, 100),
     ]);
     const teamMembers = await clientsRepo.listUsersForClient(req.client.id);
+    const sidebar = await sidebarHtml('dashboard', req.client, req.isAdminImpersonating);
     res.render('client_dashboard', {
       brand: config.brand,
       publicBaseUrl: config.publicBaseUrl,
       client: req.client,
+      page: 'dashboard',
       currentUser: req.currentUser || null,
       isAdminImpersonating: req.isAdminImpersonating || false,
       teamMembers,
@@ -49,6 +62,7 @@ router.get('/', async (req, res, next) => {
         timezone: req.client.settings?.timezone,
       }),
       flash: flashFromQuery(req),
+      sidebarHtml: sidebar,
     });
   } catch (err) { next(err); }
 });
@@ -68,6 +82,7 @@ router.get('/campaigns', async (req, res, next) => {
       [req.client.id]
     );
     const stats = r.rows[0] || {};
+    const sidebar = await sidebarHtml('campaigns', req.client, req.isAdminImpersonating);
     res.render('campaigns', {
       brand: config.brand,
       publicBaseUrl: config.publicBaseUrl,
@@ -76,6 +91,7 @@ router.get('/campaigns', async (req, res, next) => {
       stats,
       page: 'campaigns',
       flash: flashFromQuery(req),
+      sidebarHtml: sidebar,
     });
   } catch (err) { next(err); }
 });

@@ -109,7 +109,7 @@
     <div class="team-card">
       <div class="tc-top">
         <div>
-          <div class="tc-name"><%= c.name %></div>
+          <div class="tc-name"><a href="/admin/clients/<%= c.id %>" style="text-decoration:none;color:inherit"><%= c.name %></a></div>
           <div class="tc-sub"><%= c.agent_email %></div>
         </div>
         <% if (c.active && c.google && c.google.connected) { %>
