@@ -305,6 +305,21 @@ async function clearUserGoogleTokens(email) {
   );
 }
 
+/**
+ * Find the first client whose agent_email shares the same domain as the given email.
+ * Used to auto-join team members on the same domain without a manual invite.
+ */
+async function findClientByEmailDomain(domain) {
+  if (!domain) return null;
+  const r = await query(
+    "SELECT * FROM clients WHERE LOWER(agent_email) LIKE $1 ORDER BY created_at ASC LIMIT 1",
+    [`%@${domain.toLowerCase()}`]
+  );
+  if (!r.rows[0]) return null;
+  const settings = await clientSettingsRepo.findByClientId(r.rows[0].id);
+  return rowToClient(r.rows[0], settings);
+}
+
 // Returns all users for a client with their connection status
 async function listUsersForClient(clientId) {
   const r = await query(
@@ -356,6 +371,7 @@ function defaultSellerTemplateBody() {
 module.exports = {
   findById,
   findByGoogleEmail,
+  findClientByEmailDomain,
   findUserByEmail,
   upsertUser,
   upsertAdminUser,

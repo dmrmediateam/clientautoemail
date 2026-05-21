@@ -10,6 +10,12 @@ const messagesRepo = require('../repos/messages');
 const dispatcher = require('../services/dispatcher');
 const google = require('../services/google');
 const { nextWindowStart } = require('../services/scheduler');
+const bulkCampaign = require('../services/bulkCampaign');
+
+// Known batch campaigns shown on the Campaigns page
+const BATCH_CAMPAIGNS = [
+  { tag: 'ocbv_buyer_2026', label: 'Ocean Breeze Villa TCI — Buyer Outreach', icon: '🏝️' },
+];
 
 const VIEWS_DIR = path.join(__dirname, '../../views');
 
@@ -30,6 +36,8 @@ function flashFromQuery(req) {
   if (q.tested === 'fail') return { type: 'error', text: q.reason || 'Test send failed.' };
   if (q.paused) return { type: 'info', text: 'Bridge paused. Webhooks will be ignored until you resume.' };
   if (q.resumed) return { type: 'success', text: 'Bridge resumed.' };
+  if (q.activated)   return { type: 'success', text: `Campaign activated — ${q.activated} email${q.activated > 1 ? 's' : ''} queued.` };
+  if (q.deactivated) return { type: 'info',    text: `Campaign paused — ${q.deactivated} email${q.deactivated > 1 ? 's' : ''} returned to draft.` };
   if (q.replied) return { type: 'success', text: 'Reply queued and ready to send.' };
   if (q.approved) return { type: 'success', text: `Approved — ${q.approved} message${q.approved > 1 ? 's' : ''} queued for sending.` };
   if (q.sent) return { type: 'success', text: 'Email sent successfully.' };
@@ -82,6 +90,15 @@ router.get('/campaigns', async (req, res, next) => {
       [req.client.id]
     );
     const stats = r.rows[0] || {};
+
+    // Fetch status for each known batch campaign
+    const batchStatuses = await Promise.all(
+      BATCH_CAMPAIGNS.map(async bc => ({
+        ...bc,
+        status: await bulkCampaign.getStatus(bc.tag),
+      }))
+    );
+
     const sidebar = await sidebarHtml('campaigns', req.client, req.isAdminImpersonating);
     res.render('campaigns', {
       brand: config.brand,
@@ -89,10 +106,33 @@ router.get('/campaigns', async (req, res, next) => {
       client: req.client,
       isAdminImpersonating: req.isAdminImpersonating || false,
       stats,
+      batchCampaigns: batchStatuses,
       page: 'campaigns',
       flash: flashFromQuery(req),
       sidebarHtml: sidebar,
     });
+  } catch (err) { next(err); }
+});
+
+router.post('/campaigns/bulk/:tag/activate', async (req, res, next) => {
+  try {
+    const { tag } = req.params;
+    const numDays = Math.max(1, Math.min(10, Number(req.body.num_days || 2)));
+    const result  = await bulkCampaign.activate(tag, {
+      numDays,
+      timezone:    req.client.settings?.timezone,
+      windowStart: req.client.settings?.send_window_start,
+      windowEnd:   req.client.settings?.send_window_end,
+    });
+    res.redirect(`/dashboard/campaigns?activated=${result.activated}`);
+  } catch (err) { next(err); }
+});
+
+router.post('/campaigns/bulk/:tag/deactivate', async (req, res, next) => {
+  try {
+    const { tag } = req.params;
+    const result  = await bulkCampaign.deactivate(tag);
+    res.redirect(`/dashboard/campaigns?deactivated=${result.deactivated}`);
   } catch (err) { next(err); }
 });
 

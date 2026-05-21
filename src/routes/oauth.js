@@ -112,6 +112,18 @@ router.get('/google/callback', async (req, res) => {
       await clientsRepo.saveGoogleTokens(client.id, tokens);
       await clientsRepo.saveUserGoogleTokens(email, tokens);
     } else {
+      // 2.5 Domain auto-join: if the email's domain matches an existing client's agent_email domain,
+      //     add this user as a member of that team instead of creating a new standalone account.
+      const emailDomain = email.split('@')[1];
+      const domainClient = emailDomain ? await clientsRepo.findClientByEmailDomain(emailDomain) : null;
+
+      if (domainClient) {
+        console.log(`[oauth] domain match: ${email} → joining team for ${domainClient.agent_email}`);
+        await clientsRepo.upsertUser({ email, name: tokens.name, clientId: domainClient.id, role: 'member' });
+        await clientsRepo.saveUserGoogleTokens(email, tokens);
+        // Re-fetch to pick up fresh tokens if owner is already connected
+        client = await clientsRepo.findById(domainClient.id);
+      } else {
       // 3. Brand-new client — create account + owner user
       if (!tokens.refresh_token) {
         return res.status(400).send(
@@ -130,7 +142,8 @@ router.get('/google/callback', async (req, res) => {
       await clientsRepo.upsertUser({ email, name: fallbackName, clientId: client.id, role: 'owner' });
       await clientsRepo.saveGoogleTokens(client.id, tokens);
       await clientsRepo.saveUserGoogleTokens(email, tokens);
-    }
+      } // end brand-new client
+    } // end domain auto-join else
   }
   try {
     await google.watchMailbox(

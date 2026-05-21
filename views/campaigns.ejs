@@ -161,6 +161,137 @@
         When a new lead arrives via your webhook, the matching campaign fires automatically — sending your template email from the configured sender address within the next available send window. Pausing a campaign stops new automated emails for that lead type. Leads are still recorded either way.
       </div>
 
+      <%
+        // ── Batch Campaigns ──────────────────────────────────────────────────
+        const stateLabel = { ready: 'Ready', active: 'Sending', complete: 'Complete', empty: 'Empty' };
+        const stateBadge = { ready: 'badge-off', active: 'badge-on', complete: 'badge-on', empty: 'badge-off' };
+        const stateColor = { ready: 'var(--fg-muted)', active: 'var(--success)', complete: 'var(--fg-muted)', empty: 'var(--fg-muted)' };
+      %>
+      <% if (typeof batchCampaigns !== 'undefined' && batchCampaigns.length) { %>
+      <div style="margin-top:36px">
+        <h2 style="margin:0 0 6px;font-size:16px;font-weight:700">Batch Campaigns</h2>
+        <p style="margin:0 0 18px;color:var(--fg-muted);font-size:13px">One-time outreach campaigns imported from a lead list. Activate when your sender Gmail is connected.</p>
+
+        <% batchCampaigns.forEach(function(bc) { %>
+        <%
+          const st = bc.status;
+          const isActive = st.state === 'active';
+          const isReady  = st.state === 'ready';
+        %>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;margin-bottom:16px">
+
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px"><%= bc.icon %></span>
+              <div>
+                <div style="font-weight:700;font-size:15px"><%= bc.label %></div>
+                <div style="font-size:12px;color:var(--fg-muted);margin-top:2px">Tag: <code style="font-family:var(--mono);font-size:11px"><%= bc.tag %></code></div>
+              </div>
+            </div>
+            <span class="badge <%= stateBadge[st.state] || 'badge-off' %>"><%= stateLabel[st.state] || st.state %></span>
+          </div>
+
+          <%
+            const isOverdue   = st.overdue > 0;
+            const lastSentAgo = st.lastSentAt ? Math.floor((Date.now() - st.lastSentAt) / 60000) : null;
+            // "stuck" = active campaign but overdue messages and nothing sent in 30+ min
+            const isStuck = isActive && isOverdue && (lastSentAgo === null || lastSentAgo > 30);
+          %>
+          <div style="display:flex;gap:24px;margin-bottom:18px;flex-wrap:wrap">
+            <div style="text-align:center">
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--fg-muted)"><%= st.scheduled %></div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Draft</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:<%= st.queued > 0 ? 'var(--accent)' : 'var(--fg-muted)' %>"><%= st.queued %></div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Queued</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:<%= st.sent > 0 ? 'var(--success)' : 'var(--fg-muted)' %>"><%= st.sent %></div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Sent</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono)"><%= st.total %></div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Total</div>
+            </div>
+            <% if (st.lastSentAt) { %>
+            <div style="text-align:center">
+              <div style="font-size:13px;font-weight:600;font-family:var(--mono);color:var(--success)">
+                <%= lastSentAgo < 60 ? lastSentAgo + 'm ago' : Math.floor(lastSentAgo/60) + 'h ago' %>
+              </div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--fg-muted)">Last Sent</div>
+            </div>
+            <% } %>
+          </div>
+
+          <% if (isStuck) { %>
+          <div style="margin-bottom:14px;padding:12px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;font-size:13px;color:#856404;line-height:1.6">
+            <strong>⚠️ <%= st.overdue %> email<%= st.overdue === 1 ? '' : 's' %> overdue and not sending.</strong>
+            The campaign is ON but emails are not going out — the send cron may not be running.
+            <% if (!st.lastSentAt) { %>
+              No emails have been sent yet from this campaign.
+            <% } else { %>
+              Last sent <%= lastSentAgo %> minutes ago.
+            <% } %>
+            Contact support or check the Vercel cron logs.
+          </div>
+          <% } %>
+
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+
+            <% if (isReady) { %>
+            <form action="/dashboard/campaigns/bulk/<%= bc.tag %>/activate" method="post" style="display:flex;align-items:center;gap:8px">
+              <label style="font-size:13px;color:var(--fg-muted)">Spread over</label>
+              <select name="num_days" class="input" style="height:34px;width:90px;font-size:13px;padding:0 8px">
+                <option value="1">1 day</option>
+                <option value="2" selected>2 days</option>
+                <option value="3">3 days</option>
+                <option value="5">5 days</option>
+              </select>
+              <button type="submit" class="btn" style="background:var(--success);border-color:var(--success);color:#fff;height:34px;padding:0 18px;font-size:13px">
+                ▶ Activate Campaign
+              </button>
+            </form>
+            <% } %>
+
+            <% if (isActive) { %>
+            <% if (isStuck) { %>
+            <div style="font-size:13px;color:#856404;font-weight:600">⚠️ Queued but NOT sending — cron issue</div>
+            <% } else { %>
+            <div style="font-size:13px;color:var(--success);font-weight:600">&#9679; Sending — bursts of 3–5 emails, 40–70 min apart</div>
+            <% } %>
+            <form action="/dashboard/campaigns/bulk/<%= bc.tag %>/deactivate" method="post" style="margin-left:auto">
+              <button type="submit" class="btn btn-ghost" style="height:34px;font-size:13px;color:var(--fg-muted)"
+                onclick="return confirm('Pause this campaign? Queued emails will return to draft.')">
+                ⏸ Pause
+              </button>
+            </form>
+            <% } %>
+
+            <% if (st.state === 'complete') { %>
+            <div style="font-size:13px;color:var(--fg-muted)">&#10003; All emails sent.</div>
+            <% } %>
+
+            <% if (st.state === 'empty') { %>
+            <div style="font-size:13px;color:var(--fg-muted)">No messages imported yet. Run <code style="font-family:var(--mono);font-size:12px">import-ocbv-leads.js</code> first.</div>
+            <% } %>
+
+          </div>
+
+          <% if (isReady) { %>
+          <div style="margin-top:14px;padding:10px 14px;background:var(--surface-2);border-radius:6px;font-size:12px;color:var(--fg-muted);line-height:1.6">
+            <strong style="color:var(--fg)">Before activating:</strong>
+            make sure <strong>max@dmrmedia.org</strong> is connected via Gmail (sign in from the onboarding page)
+            and the <strong>buyer sender</strong> is set to max@dmrmedia.org under
+            <a href="/dashboard/template" style="color:var(--accent)">Templates</a>.
+          </div>
+          <% } %>
+
+        </div>
+        <% }); %>
+      </div>
+      <% } %>
+
     </div>
     </main>
   </div><!-- /.dash-body -->

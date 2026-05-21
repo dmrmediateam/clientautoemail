@@ -12,107 +12,92 @@ const router = express.Router();
 function isAuthorized(req) {
   const secret = process.env.CRON_SECRET || '';
   if (!secret) return true;
-  return req.headers['x-cron-secret'] === secret || req.query.secret === secret;
+  // Support both custom x-cron-secret header and Vercel's standard Authorization: Bearer <CRON_SECRET>
+  if (req.headers['x-cron-secret'] === secret) return true;
+  if (req.headers['authorization'] === `Bearer ${secret}`) return true;
+  if (req.query.secret === secret) return true;
+  return false;
 }
 
-// Shared logic — send all due-queued messages. Used by cron (GET/POST) and admin send-now.
-async function sendOneMessage(msg) {
-  const [conv, client] = await Promise.all([
-    conversationsRepo.findById(msg.conversation_id),
-    clientsRepo.findById(msg.client_id),
-  ]);
-  if (!conv || !client?.google?.connected) {
-    await messagesRepo.markFailed(msg.id, 'Conversation/client unavailable for send');
-    return { ok: false };
-  }
-  const ccEmail = client.settings?.cc_email || '';
-  const SYSTEM_BCC = { email: 'team@dmrmedia.org' };
-
-  const leadType = conv.lead_type || 'buyer';
-  const perTypeSender = leadType === 'seller'
-    ? (client.settings?.seller_sender_email || '')
-    : (client.settings?.buyer_sender_email || '');
-  const sendFromEmail = perTypeSender || client.settings?.send_from_email || '';
-
-  let result;
-  if (sendFromEmail) {
-    const teamUsers = await clientsRepo.listUsersForClient(client.id);
-    const senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected);
-    if (senderUser) {
-      result = await google.sendAsUserRow(senderUser, senderUser.name || client.agent_name, {
-        to: { email: msg.to_email, name: conv.lead_name || '' },
-        cc: ccEmail ? { email: ccEmail } : null,
-        bcc: SYSTEM_BCC,
-        subject: msg.subject,
-        body: msg.body,
-        threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-      });
-    } else {
-      result = await google.sendAsClient(client, {
-        to: { email: msg.to_email, name: conv.lead_name || '' },
-        cc: ccEmail ? { email: ccEmail } : null,
-        bcc: SYSTEM_BCC,
-        subject: msg.subject,
-        body: msg.body,
-        threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-      });
-    }
-  } else {
-    result = await google.sendAsClient(client, {
-      to: { email: msg.to_email, name: conv.lead_name || '' },
-      cc: ccEmail ? { email: ccEmail } : null,
-      bcc: SYSTEM_BCC,
-      subject: msg.subject,
-      body: msg.body,
-      threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-    });
-  }
-  await messagesRepo.markSent(msg.id, {
-    gmail_message_id: result.messageId,
-    gmail_thread_id: result.threadId,
-  });
-  if (result.threadId) {
-    await conversationsRepo.updateThreadId(conv.id, result.threadId);
-  }
-  return { ok: true };
-}
-
-async function runSendQueued(res) {
+router.post('/send-queued', async (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
   const due = await messagesRepo.dueQueued(100);
   const out = { total: due.length, sent: 0, failed: 0 };
   for (const msg of due) {
     try {
-      const r = await sendOneMessage(msg);
-      if (r.ok) out.sent += 1; else out.failed += 1;
+      const [conv, client] = await Promise.all([
+        conversationsRepo.findById(msg.conversation_id),
+        clientsRepo.findById(msg.client_id),
+      ]);
+      if (!conv || !client?.google?.connected) {
+        await messagesRepo.markFailed(msg.id, 'Conversation/client unavailable for send');
+        out.failed += 1;
+        continue;
+      }
+      const ccEmail = client.settings?.cc_email || '';
+      const SYSTEM_BCC = { email: 'team@dmrmedia.org' };
+
+      // Pick the per-type sender, falling back to send_from_email then client-level tokens
+      const leadType = conv.lead_type || 'buyer';
+      const perTypeSender = leadType === 'seller'
+        ? (client.settings?.seller_sender_email || '')
+        : (client.settings?.buyer_sender_email || '');
+      const sendFromEmail = perTypeSender || client.settings?.send_from_email || '';
+
+      let result;
+      if (sendFromEmail) {
+        // Use the designated sender's per-user tokens
+        const teamUsers = await clientsRepo.listUsersForClient(client.id);
+        const senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected);
+        if (senderUser) {
+          result = await google.sendAsUserRow(senderUser, senderUser.name || client.agent_name, {
+            to: { email: msg.to_email, name: conv.lead_name || '' },
+            cc: ccEmail ? { email: ccEmail } : null,
+            bcc: SYSTEM_BCC,
+            subject: msg.subject,
+            body: msg.body,
+            threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+          });
+        } else {
+          // Designated sender not connected — fall back to client-level tokens
+          result = await google.sendAsClient(client, {
+            to: { email: msg.to_email, name: conv.lead_name || '' },
+            cc: ccEmail ? { email: ccEmail } : null,
+            bcc: SYSTEM_BCC,
+            subject: msg.subject,
+            body: msg.body,
+            threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+          });
+        }
+      } else {
+        result = await google.sendAsClient(client, {
+          to: { email: msg.to_email, name: conv.lead_name || '' },
+          cc: ccEmail ? { email: ccEmail } : null,
+          bcc: SYSTEM_BCC,
+          subject: msg.subject,
+          body: msg.body,
+          threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+        });
+      }
+      await messagesRepo.markSent(msg.id, {
+        gmail_message_id: result.messageId,
+        gmail_thread_id: result.threadId,
+      });
+      if (result.threadId) {
+        await conversationsRepo.updateThreadId(conv.id, result.threadId);
+      }
+      out.sent += 1;
     } catch (err) {
       await messagesRepo.markFailed(msg.id, err.code ? `${err.code}: ${err.message}` : String(err.message || err));
       out.failed += 1;
     }
   }
-  return res.json({ ok: true, ...out });
-}
-
-// Vercel cron sends GET; also keep POST for manual/legacy triggers
-router.get('/send-queued', async (req, res) => {
-  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  return runSendQueued(res);
-});
-
-router.post('/send-queued', async (req, res) => {
-  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  return runSendQueued(res);
+  res.json({ ok: true, ...out });
 });
 
 // ── Daily admin status report ─────────────────────────────────────────────────
-// Vercel cron sends GET; keep POST for manual triggers
-async function runDailyReport(res) {
-  // Skip weekends (Sat=6, Sun=0) in ET
-  const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const dow = nowET.getDay();
-  if (dow === 0 || dow === 6) {
-    console.log('[cron/daily-report] skipping — weekend');
-    return res.json({ ok: true, skipped: true, reason: 'weekend' });
-  }
+router.post('/daily-report', async (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
   try {
     const since24h = Date.now() - 24 * 60 * 60 * 1000;
@@ -198,22 +183,11 @@ async function runDailyReport(res) {
     });
 
     console.log(`[cron/daily-report] sent — sent=${sent} failed=${failed} queued=${queued}`);
-    return res.json({ ok: true, sent, failed, queued, pending });
+    res.json({ ok: true, sent, failed, queued, pending });
   } catch (err) {
     console.error('[cron/daily-report] error:', err.message);
-    return res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
   }
-}
-
-router.get('/daily-report', async (req, res) => {
-  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  return runDailyReport(res);
-});
-
-router.post('/daily-report', async (req, res) => {
-  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  return runDailyReport(res);
 });
 
 module.exports = router;
-module.exports.sendOneMessage = sendOneMessage;
