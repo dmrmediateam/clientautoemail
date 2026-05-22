@@ -144,15 +144,26 @@ async function ensureFreshUserToken(userRow) {
     refresh_token: userRow.refresh_token,
     expiry_date: userRow.expiry || undefined,
   });
-  const { credentials } = await oauth2.refreshAccessToken();
-  // Persist refreshed tokens back to users row
-  await clientsRepo.saveUserGoogleTokens(userRow.email, {
-    access_token: credentials.access_token,
-    refresh_token: credentials.refresh_token,
-    expiry: credentials.expiry_date || (Date.now() + 3600 * 1000),
-    scope: credentials.scope,
-  });
-  return credentials.access_token;
+  try {
+    const { credentials } = await oauth2.refreshAccessToken();
+    // Persist refreshed tokens back to users row
+    await clientsRepo.saveUserGoogleTokens(userRow.email, {
+      access_token: credentials.access_token,
+      refresh_token: credentials.refresh_token,
+      expiry: credentials.expiry_date || (Date.now() + 3600 * 1000),
+      scope: credentials.scope,
+    });
+    return credentials.access_token;
+  } catch (err) {
+    if (err.response?.status === 400 || err.response?.status === 401 ||
+        (err.message && err.message.includes('invalid_grant'))) {
+      const e = new Error(`${userRow.email} Google token revoked — reconnect required`);
+      e.code = 'GOOGLE_REVOKED';
+      e.original = err;
+      throw e;
+    }
+    throw err;
+  }
 }
 
 // Send as a specific user row (multi-sender). agentName is the display name in From:.

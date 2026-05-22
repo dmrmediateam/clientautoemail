@@ -5,6 +5,7 @@ const messagesRepo = require('../repos/messages');
 const conversationsRepo = require('../repos/conversations');
 const clientsRepo = require('../repos/clients');
 const google = require('../services/google');
+const config = require('../config');
 const { query } = require('../db');
 
 const router = express.Router();
@@ -50,14 +51,34 @@ router.get('/send-queued', async (req, res) => {
         const teamUsers = await clientsRepo.listUsersForClient(client.id);
         const senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected);
         if (senderUser) {
-          result = await google.sendAsUserRow(senderUser, senderUser.name || client.agent_name, {
-            to: { email: msg.to_email, name: conv.lead_name || '' },
-            cc: ccEmail ? { email: ccEmail } : null,
-            bcc: SYSTEM_BCC,
-            subject: msg.subject,
-            body: msg.body,
-            threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-          });
+          try {
+            result = await google.sendAsUserRow(senderUser, senderUser.name || client.agent_name, {
+              to: { email: msg.to_email, name: conv.lead_name || '' },
+              cc: ccEmail ? { email: ccEmail } : null,
+              bcc: SYSTEM_BCC,
+              subject: msg.subject,
+              body: msg.body,
+              threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+            });
+          } catch (tokenErr) {
+            if (tokenErr.code === 'GOOGLE_REVOKED' || tokenErr.code === 'GOOGLE_NOT_CONNECTED') {
+              // Sender's token is revoked — fall back to admin relay account
+              const fallbackEmail = config.admin.superAdminEmail;
+              const adminUser = await clientsRepo.getConnectedUserRow(fallbackEmail);
+              if (!adminUser) throw new Error(`${senderUser.email} token revoked and admin fallback (${fallbackEmail}) not available`);
+              console.warn(`[cron] ${senderUser.email} token revoked — sending via fallback ${fallbackEmail} for msg ${msg.id}`);
+              result = await google.sendAsUserRow(adminUser, senderUser.name || client.agent_name, {
+                to: { email: msg.to_email, name: conv.lead_name || '' },
+                cc: ccEmail ? { email: ccEmail } : null,
+                bcc: SYSTEM_BCC,
+                subject: msg.subject,
+                body: msg.body,
+                threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+              });
+            } else {
+              throw tokenErr;
+            }
+          }
         } else {
           // Designated sender not connected — fall back to client-level tokens
           result = await google.sendAsClient(client, {

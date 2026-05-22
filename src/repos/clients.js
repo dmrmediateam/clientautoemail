@@ -238,6 +238,32 @@ async function findUserByEmail(email) {
   return r.rows[0] || null;
 }
 
+// Returns a fully-decrypted user row suitable for google.sendAsUserRow()
+async function getConnectedUserRow(email) {
+  if (!email) return null;
+  const r = await query(
+    `SELECT id, email, name, role, google_connected,
+            google_access_token_encrypted, google_refresh_token_encrypted,
+            google_token_expiry, google_scope
+     FROM users WHERE email = LOWER($1) LIMIT 1`,
+    [email]
+  );
+  if (!r.rows[0]) return null;
+  const u = r.rows[0];
+  if (!u.google_connected || !u.google_refresh_token_encrypted) return null;
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name || u.email,
+    role: u.role,
+    connected: !!u.google_connected,
+    access_token: u.google_access_token_encrypted ? enc.decrypt(u.google_access_token_encrypted) : null,
+    refresh_token: enc.decrypt(u.google_refresh_token_encrypted),
+    expiry: u.google_token_expiry ? Number(u.google_token_expiry) : 0,
+    scope: u.google_scope || '',
+  };
+}
+
 async function upsertUser({ email, name, clientId, role }) {
   const t = now();
   const r = await query(
@@ -373,6 +399,7 @@ module.exports = {
   findByGoogleEmail,
   findClientByEmailDomain,
   findUserByEmail,
+  getConnectedUserRow,
   upsertUser,
   upsertAdminUser,
   saveUserGoogleTokens,
