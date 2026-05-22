@@ -19,7 +19,7 @@ function isAuthorized(req) {
   return false;
 }
 
-router.post('/send-queued', async (req, res) => {
+router.get('/send-queued', async (req, res) => {
   if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
   const due = await messagesRepo.dueQueued(100);
   const out = { total: due.length, sent: 0, failed: 0 };
@@ -96,7 +96,7 @@ router.post('/send-queued', async (req, res) => {
 });
 
 // ── Daily admin status report ─────────────────────────────────────────────────
-router.post('/daily-report', async (req, res) => {
+router.get('/daily-report', async (req, res) => {
   if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
   try {
