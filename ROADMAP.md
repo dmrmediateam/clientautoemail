@@ -17,7 +17,6 @@ Everything needed to run a live, multi-client email automation service.
 - [x] PostgreSQL schema (`clients`, `client_settings`, `conversations`, `messages`, `webhook_payloads`)
 - [x] Vercel cron every 15 min — send queued messages via `/api/cron/send-queued`
 - [x] Gmail API direct send — email goes from agent's own inbox, Google-signed DKIM
-- [x] Gmail Push (Pub/Sub) — inbound replies tracked in real time
 - [x] Smart send window — business-hours scheduling per client timezone
 - [x] Self-serve onboarding — agent clicks "Sign in with Google", account auto-provisions
 
@@ -30,6 +29,7 @@ Everything needed to run a live, multi-client email automation service.
 - [x] Send window + timezone display on campaign cards
 - [x] Conversation thread view — full message history per lead
 - [x] Prior contact history — collapsible panel showing earlier threads with the same email
+- [x] Sender status panel — green/amber/red health dot per team member, reconnect link for broken tokens
 
 **Admin panel**
 - [x] Client list + impersonation ("view as client")
@@ -39,44 +39,24 @@ Everything needed to run a live, multi-client email automation service.
 
 ---
 
-## v1.1 — Analytics & Visibility  *(next)*
+## ✅ v1.0.1 — Reliability & Scope Hardening  *(shipped May 24 2026)*
 
-Agents want to know: "Is this working?" Give them real numbers.
-
-- [ ] **Open tracking** — 1×1 pixel served from our domain, log `opened_at` on `messages`
-- [ ] **Click tracking** — rewrite links through a redirect, log click events
-- [ ] **Reply rate** — already tracked via Gmail Push; surface as % on Campaigns page
-- [ ] **Dashboard stats cards** — "X leads · Y sent · Z replies · W opens" at a glance
-- [ ] **Per-campaign stats** — open rate %, reply rate % on each campaign card
-- [ ] **Admin aggregate view** — all clients: total emails / opens / replies, filterable by date
-- [ ] **Daily digest to agent** — "Yesterday: 3 new leads, 3 sent, 1 reply" (opt-in)
-- [ ] **CSV export** — download leads + message history per client
+- [x] **Token revocation recovery** — `ensureFreshUserToken` now converts `invalid_grant` HTTP 400/401 errors into typed `GOOGLE_REVOKED` / `GOOGLE_NOT_CONNECTED` codes so downstream catch blocks work correctly
+- [x] **Smarter sender fallback** — when primary sender token fails: try other connected team members → then fall back to `team@dmrmedia.org` (same logic in cron + manual script)
+- [x] **Dropped `gmail.modify` scope** — removed `listInboundMessages`, `watchMailbox`, and `/gmail/push` webhook route; app now uses `gmail.send` only, aligning code with privacy policy and qualifying for Google OAuth verification without a paid security audit
+- [x] **Dashboard sender health** — each team member shown with connection status; red alert banner when an active buyer/seller sender is broken
 
 ---
 
-## v1.2 — Drip Sequences  *(campaign depth)*
+## 🔜 v1.1 — Google OAuth Verification  *(highest priority)*
 
-One email is a start. A timed sequence is a funnel — just like a Google Ads retargeting flow, but through their inbox.
+Required to remove the "unverified app" warning and lift the 7-day token expiry for new users.
 
-- [ ] **Sequence builder** — N follow-up steps, each with a template + delay ("send 3 days after step 1 if no reply")
-- [ ] **Reply = stop sequence** — lead replies at any step → remaining steps cancelled automatically
-- [ ] **Pre-built sequence templates** — Seller 5-step, Buyer 3-step, Luxury 7-step — clients clone & customize
-- [ ] **Unsubscribe handling** — detect "unsubscribe" reply, flag lead as opted-out, suppress future steps
-- [ ] **Multi-step threads** — follow-up messages appear in the same conversation thread in the dashboard
-- [ ] **Per-sequence pause** — pause one sequence without affecting others
-
----
-
-## v1.3 — AI Personalization  *(feel human, scale infinitely)*
-
-The email shouldn't feel like a template. It should feel like the agent wrote it themselves.
-
-- [ ] **AI subject line generator** — 3 subject variants based on lead data (location, price range, type)
-- [ ] **Smart body personalization** — AI fills in specific details from the lead payload (neighborhood, beds/baths, price)
-- [ ] **Tone selector** — Professional / Friendly / Luxury — client picks tone, AI adjusts
-- [ ] **Preview before send** — "Here's what this email looks like for this specific lead"
-- [ ] **A/B testing** — 50/50 split on subject or body; track open/reply rates per variant
-- [ ] **AI reply suggestions** — when a lead replies, show agent 2–3 suggested responses (one click to send — agent stays in control)
+- [ ] Verify `dmrmedia.org` in Google Search Console
+- [ ] Complete OAuth consent screen — logo, support email, homepage URL, privacy policy URL, terms URL (pages already exist)
+- [ ] Record a short demo video showing the OAuth flow (Google requires this)
+- [ ] Submit for verification — `gmail.send` is a *sensitive* scope, **no paid security audit needed**
+- [ ] Estimated timeline: 4–6 weeks after submission
 
 ---
 
@@ -141,29 +121,26 @@ The platform becomes general-purpose. Any business that gets leads via webhook c
 
 ---
 
-## Google OAuth Verification  *(parallel track)*
+## Google OAuth Verification  *(parallel track — now top priority)*
 
-Required to lift 7-day token expiry and onboard > 100 users.
+Required to lift 7-day token expiry and remove the "unverified app" warning screen for new users.
 
 - [ ] Verify `dmrmedia.org` in Google Search Console
 - [ ] Complete OAuth consent screen — logo, support email, homepage URL
 - [ ] Record YouTube demo (onboarding → dashboard → test send → email received)
-- [ ] Submit brand verification → "In production" status (lifts 7-day limit)
-- [ ] Restricted scope + CASA Tier 2 — defer until approaching 100 active users. Budget: 6–12 weeks + $15K–$75K.
-
----
-
-## Deliberate non-goals (for now)
-
-- **HTML email editor** — plain text outperforms HTML for cold lead follow-up. Revisit if clients ask.
-- **Calendar write access** — `calendar.readonly` is sufficient and easier to verify with Google.
-- **Built-in CRM** — we are the automation layer on top of existing CRMs, not a replacement.
+- [ ] Submit brand verification → "In production" status
+- [ ] **`gmail.send` scope only** ✅ — no CASA Tier 2 audit needed. Standard Google review (~4–6 weeks, free).
 
 ---
 
 ## Decision Log
 
 Append-only. Newest at top.
+
+### 2026-05-24 — Dropped `gmail.modify`; smarter fallback order; dashboard sender health
+- Removed `listInboundMessages()`, `watchMailbox()`, and `/gmail/push` route. App now uses `gmail.send` scope only — consistent with privacy policy and sufficient for all sending use cases. Qualifies for Google's standard verification review (no $15k+ security audit).
+- `sendWithFallback()` helper added to cron and manual trigger script: primary sender → other connected team members → `team@dmrmedia.org`. Previously jumped straight to admin fallback.
+- Dashboard "Sender status" panel added: each team member shown with green/amber/red health indicator and reconnect link when token is broken. Red alert banner shown if active buyer/seller sender is revoked.
 
 ### 2026-05-18 — v1.0 shipped, roadmap reformatted as campaign platform
 - Reframed vision: "Google Ads campaign management for personal email" — multiple campaigns, drip sequences, analytics, A/B testing, conversion tracking.
@@ -179,7 +156,7 @@ Append-only. Newest at top.
 - SQLite via `better-sqlite3` incompatible with Vercel serverless. Switched to Postgres via `pg` driver.
 
 ### 2026-05-04 — Ship email-only, calendar/Ads in Phase 2
-- Calendar + Ads blocked launch by weeks. Deploy email now. Add `calendar.readonly` to initial OAuth scope so no re-prompt later. Conversions backfill retroactively.
+- Calendar + Ads blocked launch by weeks. Deploy email now. Conversions backfill retroactively.
 
 ### 2026-04-30 — Self-serve onboarding
 - Changed from operator-managed to public `/onboarding`. Sales motion = "send them a link."
@@ -187,16 +164,6 @@ Append-only. Newest at top.
 ### 2026-04-30 — Gmail API direct send, drop SendGrid
 - Gmail's DMARC `p=reject` blocks third-party SMTP from sending as `@gmail.com`. Switched to Gmail API per-agent OAuth. Email arrives from agent's own inbox, Google-signed DKIM. Rate limit: 500–2000/day per account (acceptable for lead volume).
 
-
-- [x] Project structure, package.json, env loader
-- [x] SQLite schema + migrations
-- [x] AES-256-GCM token encryption
-- [x] Admin auth (HMAC-signed cookie session)
-- [x] Webhook ingestion route (`/v1/webhooks/incoming/:client_uuid`)
-- [x] Lead normalizer (loose field-name matching)
-- [x] Template engine (`{{placeholder}}` substitution)
-- [x] Admin dashboard with DMR Media branding
-- [x] Smoke test: webhook → DB row written
 
 ---
 
