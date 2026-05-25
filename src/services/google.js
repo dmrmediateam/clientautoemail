@@ -285,66 +285,6 @@ function parseEmailAddress(raw) {
   return value.trim().toLowerCase();
 }
 
-async function listInboundMessages(client, maxResults = 15) {
-  await ensureFreshToken(client);
-  const fresh = await clientsRepo.findById(client.id);
-  const oauth2 = buildOAuthClient();
-  oauth2.setCredentials({
-    access_token: fresh.google.access_token,
-    refresh_token: fresh.google.refresh_token,
-    expiry_date: fresh.google.expiry,
-  });
-  const gmail = google.gmail({ version: 'v1', auth: oauth2 });
-  const list = await gmail.users.messages.list({
-    userId: 'me',
-    q: 'in:inbox newer_than:7d',
-    maxResults,
-  });
-  const ids = list.data.messages || [];
-  const out = [];
-  for (const item of ids) {
-    const full = await gmail.users.messages.get({
-      userId: 'me',
-      id: item.id,
-      format: 'full',
-    });
-    const payload = full.data.payload || {};
-    const headers = payload.headers || [];
-    out.push({
-      gmail_message_id: full.data.id,
-      gmail_thread_id: full.data.threadId,
-      internet_message_id: parseHeader(headers, 'Message-ID'),
-      from_email: parseEmailAddress(parseHeader(headers, 'From')),
-      to_email: parseEmailAddress(parseHeader(headers, 'To')),
-      subject: parseHeader(headers, 'Subject') || '',
-      body: decodeBodyPart(payload) || full.data.snippet || '',
-      internal_date: Number(full.data.internalDate || Date.now()),
-    });
-  }
-  return out;
-}
-
-async function watchMailbox(client, topicName) {
-  if (!topicName) return null;
-  await ensureFreshToken(client);
-  const fresh = await clientsRepo.findById(client.id);
-  const oauth2 = buildOAuthClient();
-  oauth2.setCredentials({
-    access_token: fresh.google.access_token,
-    refresh_token: fresh.google.refresh_token,
-    expiry_date: fresh.google.expiry,
-  });
-  const gmail = google.gmail({ version: 'v1', auth: oauth2 });
-  const watch = await gmail.users.watch({
-    userId: 'me',
-    requestBody: {
-      topicName,
-      labelIds: ['INBOX'],
-    },
-  });
-  return watch.data;
-}
-
 module.exports = {
   generateAuthUrl,
   exchangeCode,
@@ -352,7 +292,5 @@ module.exports = {
   ensureFreshUserToken,
   sendAsClient,
   sendAsUserRow,
-  listInboundMessages,
-  watchMailbox,
   buildRfc822,
 };

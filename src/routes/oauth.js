@@ -145,14 +145,6 @@ router.get('/google/callback', async (req, res) => {
       } // end brand-new client
     } // end domain auto-join else
   }
-  try {
-    await google.watchMailbox(
-      await clientsRepo.findById(client.id),
-      process.env.GMAIL_PUBSUB_TOPIC || ''
-    );
-  } catch (err) {
-    console.warn('[oauth] gmail watch setup skipped:', err.message);
-  }
   issueClientSession(res, client.id, email);
   res.redirect('/dashboard?connected=1');
 });
