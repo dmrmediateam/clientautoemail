@@ -12,6 +12,32 @@ const config         = require('../src/config');
 
 const SYSTEM_BCC = { email: 'team@dmrmedia.org' };
 
+async function sendWithFallback(primaryUser, client, msgParams, teamUsers, adminFallbackEmail, msgId) {
+  const displayName = primaryUser.name || client.agent_name;
+  try {
+    return await google.sendAsUserRow(primaryUser, displayName, msgParams);
+  } catch (err) {
+    if (err.code !== 'GOOGLE_REVOKED' && err.code !== 'GOOGLE_NOT_CONNECTED') throw err;
+    console.warn(`  msg ${msgId}: ${primaryUser.email} revoked — trying other team members`);
+  }
+  const others = teamUsers.filter(u =>
+    u.email.toLowerCase() !== primaryUser.email.toLowerCase() &&
+    u.connected && u.refresh_token
+  );
+  for (const alt of others) {
+    try {
+      console.warn(`  msg ${msgId}: trying ${alt.email}`);
+      return await google.sendAsUserRow(alt, displayName, msgParams);
+    } catch (e2) {
+      if (e2.code !== 'GOOGLE_REVOKED' && e2.code !== 'GOOGLE_NOT_CONNECTED') throw e2;
+    }
+  }
+  const adminUser = await clientsRepo.getConnectedUserRow(adminFallbackEmail);
+  if (!adminUser) throw new Error(`All senders revoked and admin fallback (${adminFallbackEmail}) unavailable`);
+  console.warn(`  msg ${msgId}: all team senders failed — using ${adminFallbackEmail}`);
+  return await google.sendAsUserRow(adminUser, displayName, msgParams);
+}
+
 (async () => {
   const due = await messagesRepo.dueQueued(100);
   console.log(`Messages due: ${due.length}`);
@@ -45,33 +71,15 @@ const SYSTEM_BCC = { email: 'team@dmrmedia.org' };
         const teamUsers = await clientsRepo.listUsersForClient(client.id);
         const senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected);
         if (senderUser) {
-          try {
-            result = await google.sendAsUserRow(senderUser, senderUser.name || client.agent_name, {
-              to: { email: msg.to_email, name: conv.lead_name || '' },
-              cc: ccEmail ? { email: ccEmail } : null,
-              bcc: SYSTEM_BCC,
-              subject: msg.subject,
-              body: msg.body,
-              threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-            });
-          } catch (tokenErr) {
-            if (tokenErr.code === 'GOOGLE_REVOKED' || tokenErr.code === 'GOOGLE_NOT_CONNECTED') {
-              const fallbackEmail = config.admin.superAdminEmail;
-              const adminUser = await clientsRepo.getConnectedUserRow(fallbackEmail);
-              if (!adminUser) throw new Error(`${senderUser.email} token revoked and admin fallback (${fallbackEmail}) not available`);
-              console.warn(`  FALLBACK: ${senderUser.email} revoked — sending via ${fallbackEmail}`);
-              result = await google.sendAsUserRow(adminUser, senderUser.name || client.agent_name, {
-                to: { email: msg.to_email, name: conv.lead_name || '' },
-                cc: ccEmail ? { email: ccEmail } : null,
-                bcc: SYSTEM_BCC,
-                subject: msg.subject,
-                body: msg.body,
-                threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-              });
-            } else {
-              throw tokenErr;
-            }
-          }
+          const msgParams = {
+            to: { email: msg.to_email, name: conv.lead_name || '' },
+            cc: ccEmail ? { email: ccEmail } : null,
+            bcc: SYSTEM_BCC,
+            subject: msg.subject,
+            body: msg.body,
+            threadId: conv.thread_id || msg.gmail_thread_id || undefined,
+          };
+          result = await sendWithFallback(senderUser, client, msgParams, teamUsers, config.admin.superAdminEmail, msg.id);
         } else {
           result = await google.sendAsClient(client, {
             to: { email: msg.to_email, name: conv.lead_name || '' },

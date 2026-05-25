@@ -52,6 +52,20 @@ router.get('/', async (req, res, next) => {
       messagesRepo.listRecentByClient(req.client.id, 100),
     ]);
     const teamMembers = await clientsRepo.listUsersForClient(req.client.id);
+
+    // Annotate each team member with their sender role(s) for the UI
+    const buyerSender = (req.client.settings?.buyer_sender_email || req.client.settings?.send_from_email || '').toLowerCase();
+    const sellerSender = (req.client.settings?.seller_sender_email || req.client.settings?.send_from_email || '').toLowerCase();
+    const annotatedTeam = teamMembers.map(u => ({
+      ...u,
+      isBuyerSender:  buyerSender  && u.email.toLowerCase() === buyerSender,
+      isSellerSender: sellerSender && u.email.toLowerCase() === sellerSender,
+      // health: 'ok' | 'warning' | 'disconnected'
+      health: !u.connected ? 'disconnected'
+            : !u.refresh_token ? 'warning'
+            : 'ok',
+    }));
+
     const sidebar = await sidebarHtml('dashboard', req.client, req.isAdminImpersonating);
     res.render('client_dashboard', {
       brand: config.brand,
@@ -60,7 +74,7 @@ router.get('/', async (req, res, next) => {
       page: 'dashboard',
       currentUser: req.currentUser || null,
       isAdminImpersonating: req.isAdminImpersonating || false,
-      teamMembers,
+      teamMembers: annotatedTeam,
       conversations,
       recentMessages,
       nextSendAt: nextWindowStart({

@@ -172,6 +172,48 @@
       </div>
     </div>
 
+    <%
+      const anyRevoked = teamMembers.some(u => u.health !== 'ok' && (u.isBuyerSender || u.isSellerSender));
+    %>
+    <% if (teamMembers.length > 0) { %>
+    <% if (anyRevoked) { %>
+    <div class="flash flash-error" style="margin-bottom:16px">
+      ⚠️ One or more of your sender accounts needs to be reconnected. Emails are being sent via a backup account until this is resolved.
+    </div>
+    <% } %>
+    <div class="panel" style="margin-bottom:20px">
+      <h2 style="margin-top:0">Sender status</h2>
+      <p class="help" style="margin-bottom:16px">These are the Gmail accounts used to send emails on your behalf.</p>
+      <% teamMembers.forEach(u => { %>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:<%= u.health==='ok' ? 'var(--success)' : u.health==='warning' ? '#f59e0b' : 'var(--danger)' %>"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= u.email %></div>
+          <div style="font-size:11px;color:var(--fg-muted);margin-top:2px">
+            <% if (u.isBuyerSender && u.isSellerSender) { %>Buyer &amp; Seller sender
+            <% } else if (u.isBuyerSender) { %>Buyer sender
+            <% } else if (u.isSellerSender) { %>Seller sender
+            <% } else { %>Team member<% } %>
+            <% if (u.name && u.name !== u.email) { %> · <%= u.name %><% } %>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <% if (u.health === 'ok') { %>
+            <span class="badge badge-on">Connected</span>
+          <% } else if (u.health === 'warning') { %>
+            <span class="badge badge-warn">Needs reconnect</span>
+          <% } else { %>
+            <span class="badge badge-err">Disconnected</span>
+          <% } %>
+          <% if (u.health !== 'ok' && (u.isBuyerSender || u.isSellerSender)) { %>
+            <br><a href="/auth/google/start" style="font-size:11px;margin-top:4px;display:inline-block">Reconnect →</a>
+          <% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+    <% } %>
+
     <% if (!isLive || conversations.length === 0) { %>
     <div class="panel" style="margin-bottom:20px">
       <h2 style="margin-top:0">Getting started</h2>
