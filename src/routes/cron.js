@@ -5,41 +5,9 @@ const messagesRepo = require('../repos/messages');
 const conversationsRepo = require('../repos/conversations');
 const clientsRepo = require('../repos/clients');
 const google = require('../services/google');
-const config = require('../config');
 const { query } = require('../db');
 
 const router = express.Router();
-
-// Try primary sender → other connected team members → admin fallback
-async function sendWithFallback(primaryUser, client, msgParams, teamUsers, adminFallbackEmail, msgId) {
-  const displayName = primaryUser.name || client.agent_name;
-  // 1. Try primary sender
-  try {
-    return await google.sendAsUserRow(primaryUser, displayName, msgParams);
-  } catch (err) {
-    if (err.code !== 'GOOGLE_REVOKED' && err.code !== 'GOOGLE_NOT_CONNECTED') throw err;
-    console.warn(`[cron] msg ${msgId}: ${primaryUser.email} token revoked — trying other team members`);
-  }
-  // 2. Try other connected team members for this client
-  const others = teamUsers.filter(u =>
-    u.email.toLowerCase() !== primaryUser.email.toLowerCase() &&
-    u.connected && u.refresh_token
-  );
-  for (const alt of others) {
-    try {
-      console.warn(`[cron] msg ${msgId}: trying team member ${alt.email}`);
-      return await google.sendAsUserRow(alt, displayName, msgParams);
-    } catch (e2) {
-      if (e2.code !== 'GOOGLE_REVOKED' && e2.code !== 'GOOGLE_NOT_CONNECTED') throw e2;
-      console.warn(`[cron] msg ${msgId}: ${alt.email} also revoked`);
-    }
-  }
-  // 3. Last resort: admin fallback
-  const adminUser = await clientsRepo.getConnectedUserRow(adminFallbackEmail);
-  if (!adminUser) throw new Error(`All senders revoked and admin fallback (${adminFallbackEmail}) unavailable`);
-  console.warn(`[cron] msg ${msgId}: all team senders failed — using admin fallback ${adminFallbackEmail}`);
-  return await google.sendAsUserRow(adminUser, displayName, msgParams);
-}
 
 function isAuthorized(req) {
   const secret = process.env.CRON_SECRET || '';
@@ -51,7 +19,7 @@ function isAuthorized(req) {
   return false;
 }
 
-router.get('/send-queued', async (req, res) => {
+router.post('/send-queued', async (req, res) => {
   if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
   const due = await messagesRepo.dueQueued(100);
   const out = { total: due.length, sent: 0, failed: 0 };
@@ -79,18 +47,17 @@ router.get('/send-queued', async (req, res) => {
       let result;
       if (sendFromEmail) {
         // Use the designated sender's per-user tokens
-        const teamUsers = await clientsRepo.listUsersForClient(client.id);  // also used by sendWithFallback
+        const teamUsers = await clientsRepo.listUsersForClient(client.id);
         const senderUser = teamUsers.find(u => u.email.toLowerCase() === sendFromEmail.toLowerCase() && u.connected);
         if (senderUser) {
-          const msgParams = {
+          result = await google.sendAsUserRow(senderUser, senderUser.name || client.agent_name, {
             to: { email: msg.to_email, name: conv.lead_name || '' },
             cc: ccEmail ? { email: ccEmail } : null,
             bcc: SYSTEM_BCC,
             subject: msg.subject,
             body: msg.body,
             threadId: conv.thread_id || msg.gmail_thread_id || undefined,
-          };
-          result = await sendWithFallback(senderUser, client, msgParams, teamUsers, config.admin.superAdminEmail, msg.id);
+          });
         } else {
           // Designated sender not connected — fall back to client-level tokens
           result = await google.sendAsClient(client, {
@@ -129,14 +96,14 @@ router.get('/send-queued', async (req, res) => {
 });
 
 // ── Daily admin status report ─────────────────────────────────────────────────
-router.get('/daily-report', async (req, res) => {
+router.post('/daily-report', async (req, res) => {
   if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
   try {
     const since24h = Date.now() - 24 * 60 * 60 * 1000;
 
     // Stats queries (run in parallel)
-    const [msgStats, clientStats, failedMsgs, queuedMsgs] = await Promise.all([
+    const [msgStats, clientStats, failedMsgs, queuedMsgs, allClientsQ, allUsersQ, settingsQ, invalidGrantQ] = await Promise.all([
       query(`SELECT status, COUNT(*) as n FROM messages
              WHERE created_at > $1 GROUP BY status`, [since24h]),
       query(`SELECT COUNT(*) as total,
@@ -148,6 +115,19 @@ router.get('/daily-report', async (req, res) => {
              ORDER BY m.created_at DESC LIMIT 10`, [since24h]),
       query(`SELECT COUNT(*) as n FROM messages WHERE status IN ('queued','pending')
              AND scheduled_for <= $1`, [Date.now() + 4 * 60 * 60 * 1000]),
+      query(`SELECT id, name, agent_email, active, google_email,
+                    (google_refresh_token_encrypted IS NOT NULL) AS client_connected
+             FROM clients ORDER BY name`),
+      query(`SELECT client_id, email, name, role,
+                    (google_refresh_token_encrypted IS NOT NULL) AS user_connected
+             FROM users ORDER BY client_id, role`),
+      query(`SELECT client_id, send_from_email, buyer_sender_email, seller_sender_email
+             FROM client_settings`),
+      query(`SELECT m.client_id, COUNT(*) AS n
+             FROM messages m
+             WHERE m.status = 'failed' AND m.error ILIKE '%invalid_grant%'
+               AND m.created_at > $1
+             GROUP BY m.client_id`, [Date.now() - 7 * 24 * 60 * 60 * 1000]),
     ]);
 
     const stats = {};
@@ -188,9 +168,70 @@ router.get('/daily-report', async (req, res) => {
       body += `ATTENTION: ${overdueQueued} message(s) queued/pending due in next 4h\n\n`;
     }
 
+    // ── Per-client token health ──────────────────────────────────────────────
+    const usersByClient = {};
+    for (const u of allUsersQ.rows) {
+      if (!usersByClient[u.client_id]) usersByClient[u.client_id] = [];
+      usersByClient[u.client_id].push(u);
+    }
+    const settingsByClient = {};
+    for (const s of settingsQ.rows) { settingsByClient[s.client_id] = s; }
+    const invalidGrantByClient = {};
+    for (const r of invalidGrantQ.rows) { invalidGrantByClient[r.client_id] = Number(r.n); }
+
+    body += `CLIENT TOKEN HEALTH\n`;
+    body += `${'─'.repeat(48)}\n\n`;
+
+    for (const c of allClientsQ.rows) {
+      const settings = settingsByClient[c.id] || {};
+      const users = usersByClient[c.id] || [];
+      const hasInvalidGrant = (invalidGrantByClient[c.id] || 0) > 0;
+
+      const senderEmails = new Set(
+        [settings.send_from_email, settings.buyer_sender_email, settings.seller_sender_email]
+          .filter(Boolean).map(e => e.toLowerCase())
+      );
+
+      const anyDesignatedDisconnected = [...senderEmails].some(email => {
+        const u = users.find(u => u.email.toLowerCase() === email);
+        return !u || !u.user_connected;
+      });
+
+      const clientOk = c.client_connected && !anyDesignatedDisconnected && !hasInvalidGrant;
+      const icon = clientOk ? '[OK]' : '[!!]';
+
+      body += `${icon} ${c.name}${c.active ? '' : ' (inactive)'}\n`;
+
+      if (settings.send_from_email)    body += `     Default sender:  ${settings.send_from_email}\n`;
+      if (settings.buyer_sender_email) body += `     Buyer sender:    ${settings.buyer_sender_email}\n`;
+      if (settings.seller_sender_email)body += `     Seller sender:   ${settings.seller_sender_email}\n`;
+      if (!settings.send_from_email && !settings.buyer_sender_email && !settings.seller_sender_email) {
+        body += `     Sender: client-level token (${c.google_email || 'unset'})\n`;
+      }
+
+      const clientTokenStatus = c.client_connected ? 'connected' : 'DISCONNECTED - reconnect at /auth/google/start';
+      body += `     Client token: ${c.client_connected ? '[OK]' : '[!!]'} ${clientTokenStatus}\n`;
+
+      if (users.length > 0) {
+        body += `     Team:\n`;
+        for (const u of users) {
+          const isDesignated = senderEmails.has(u.email.toLowerCase());
+          const tokenStatus = u.user_connected ? '[OK] connected' : '[!!] DISCONNECTED — needs to reconnect';
+          const tag = isDesignated ? ' (sender)' : '';
+          body += `       ${u.email}${tag}: ${tokenStatus}\n`;
+        }
+      }
+
+      if (hasInvalidGrant) {
+        body += `     [!!] invalid_grant errors in last 7 days — token likely revoked\n`;
+      }
+
+      body += `\n`;
+    }
+
     body += `─────────────────────────────────────────────────\n`;
     body += `DMR Media — clientautoemail\n`;
-    body += `https://clientautoemail.vercel.app/admin\n`;
+    body += `https://email.dmrmedia.org/admin\n`;
 
     // Send via team@dmrmedia.org — look up via listUsersForClient using the admin client
     // Find team user across all users (any client) by scanning listUsersForClient per client
