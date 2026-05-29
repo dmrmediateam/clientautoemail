@@ -285,6 +285,23 @@ function parseEmailAddress(raw) {
   return value.trim().toLowerCase();
 }
 
+/**
+ * Actively revoke a refresh token on Google's servers.
+ * Must be called before deleting tokens from the DB on user disconnect.
+ * Required by Google API Terms of Service § User Data — token revocation.
+ * Silently ignores errors (token may already be expired/revoked).
+ */
+async function revokeToken(refreshToken) {
+  if (!refreshToken) return;
+  try {
+    const oauth2 = buildOAuthClient();
+    await oauth2.revokeToken(refreshToken);
+  } catch (err) {
+    // Log but don't throw — the DB cleanup should proceed regardless
+    console.warn('[google] revokeToken failed (may already be revoked):', err.message);
+  }
+}
+
 module.exports = {
   generateAuthUrl,
   exchangeCode,
@@ -293,4 +310,5 @@ module.exports = {
   sendAsClient,
   sendAsUserRow,
   buildRfc822,
+  revokeToken,
 };

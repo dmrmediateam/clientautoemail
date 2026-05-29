@@ -159,7 +159,16 @@ router.post('/disconnect', async (req, res) => {
   if (cookie) {
     try {
       const payload = JSON.parse(Buffer.from(cookie.split('.')[0], 'base64url').toString('utf8'));
+      // Step 1: actively revoke tokens on Google's servers (required by Google API ToS § 5.2)
+      if (payload.uid) {
+        try {
+          const userRow = await clientsRepo.getConnectedUserRow(payload.uid);
+          if (userRow?.refresh_token) await google.revokeToken(userRow.refresh_token);
+        } catch { /* ignore — DB cleanup proceeds regardless */ }
+      }
+      // Step 2: clear both the client-level token AND the user-level token from the DB.
       if (payload.cid) await clientsRepo.clearGoogleTokens(payload.cid);
+      if (payload.uid) await clientsRepo.clearUserGoogleTokens(payload.uid);
     } catch { /* ignore */ }
   }
   clearClientSession(res);
