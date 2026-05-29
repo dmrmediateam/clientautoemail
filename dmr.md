@@ -1,3 +1,80 @@
+Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git status ; git log --oneline -5
+
+Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git diff src/repos/clientSettings.js views/campaigns.ejs views/client_form.ejs
+
+All clean. Commit and push: 
+
+Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git add -A ; git commit -m "feat: segment buyer/seller campaigns, pause buyer by default
+
+- defaultSettings: buyer_paused: true (new clients start with buyer off)
+- Migrated all existing clients to buyer_paused=true via script
+- campaigns.ejs: buyer card desc notes it is paused by default
+- client_form.ejs: remove dead SendGrid API key field
+- docs: update GOOGLE_OAUTH_VERIFICATION.md and dmr.md
+- scripts: _promote-sam-gmail.js, _pause-all-buyer-campaigns.js"
+
+Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git push origin main
+
+Pushed. Vercel is deploying now (usually ~60 seconds). While it builds, here's the exact step-by-step for Google verification:
+
+---
+
+## Google Verification — Your Checklist
+
+**Status right now:** App is in `Testing` mode → only listed test users can connect, tokens expire in 7 days.
+
+**Goal:** `Published → Verified` → no warnings, no expiry, anyone can connect.
+
+---
+
+### Step 1 — Publish the app (do this RIGHT NOW, takes 2 minutes)
+
+This is the single most important action — stops the 7-day token expiry today.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Select your project → **APIs & Services → OAuth consent screen**
+3. Find **Publishing Status** → click **Publish App** → confirm
+
+That's it. Everyone's tokens stop expiring. Sam, Linda, future agents — all safe.
+
+---
+
+### Step 2 — Verify the consent screen is filled out correctly
+
+While you're there, confirm these fields match exactly:
+
+| Field | Value |
+|---|---|
+| App name | `DMR Media Lead Responder` |
+| Homepage | `https://leads.dmrmedia.org/onboarding` |
+| Privacy policy | `https://leads.dmrmedia.org/privacy` |
+| Terms of service | `https://leads.dmrmedia.org/terms` |
+| Scopes | `gmail.send`, `userinfo.email`, `userinfo.profile` |
+
+---
+
+### Step 3 — Record the verification video (~60 sec)
+
+Google requires a screen recording. Go through this exact flow:
+1. Open `https://leads.dmrmedia.org/onboarding` — show the "Sign in with Google" button
+2. Click it → Google consent screen appears — **pause here** so scopes are visible
+3. Approve → land on the dashboard showing the connected email + "Sending via..." 
+4. Briefly show a conversation with a green **Sent** badge
+
+Upload to YouTube as **Unlisted**. Copy the link.
+
+---
+
+### Step 4 — Submit verification form
+
+Back in GCP → OAuth consent screen → **Prepare for Verification**. The scope justification text is pre-written in GOOGLE_OAUTH_VERIFICATION.md — just copy/paste.
+
+---
+
+**Start with Step 1 right now** — everything else can wait. Want me to walk through anything in more detail?
+
+-----
+
 # DMR Media — Lead Response Bridge
 ## Operations, Client Onboarding & Google OAuth Verification Guide
 
