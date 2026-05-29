@@ -1,5 +1,8 @@
 # Google OAuth App Verification Guide
 
+> **This is the technical reference for Google Cloud Console steps.**  
+> For the full operational guide including client onboarding, white-label setup, and readiness checklists, see [dmr.md](dmr.md).
+
 Your app only uses `gmail.send` — a **sensitive scope**, not a restricted one.  
 This means **no security audit, no CASA assessment**. Just a form + a short video.
 
@@ -7,11 +10,11 @@ This means **no security audit, no CASA assessment**. Just a form + a short vide
 
 ## Before You Start — What You Need Ready
 
-1. **Production URL** — your live Vercel app (e.g. `https://clientautoemail.vercel.app` or your custom domain)
-2. **Privacy Policy URL** — `https://yourcustomdomain.com/privacy` (already built)
-3. **Terms of Service URL** — `https://yourcustomdomain.com/terms` (already built)
-4. **App logo** — a square PNG, at least 120×120px (e.g. DMR Media logo)
-5. **A Google account** that owns the Google Cloud project (the one with the OAuth credentials)
+1. **Production URL** — `https://leads.dmrmedia.org/onboarding` (the live Vercel app)
+2. **Privacy Policy URL** — `https://leads.dmrmedia.org/privacy` ✅ (already built at `/privacy`)
+3. **Terms of Service URL** — `https://leads.dmrmedia.org/terms` ✅ (already built at `/terms`)
+4. **App logo** — a square PNG, at least 120×120px (DMR Media logo)
+5. **A Google account** that owns the Google Cloud project — the one whose credentials are in `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in Vercel
 6. **A short screen recording** (~60 seconds) showing the OAuth flow — required by Google for sensitive scopes
 
 ---
@@ -30,13 +33,13 @@ Click **Edit App** (or start the form if not filled out yet).
 
 | Field | What to Enter |
 |---|---|
-| App name | `DMR Media Client Email` (or similar) |
+| App name | `DMR Media Lead Responder` |
 | User support email | `max@dmrmedia.org` |
-| App logo | Upload your logo (square PNG, 120×120 min) |
-| App home page | `https://yourcustomdomain.com` |
-| App privacy policy | `https://yourcustomdomain.com/privacy` |
-| App terms of service | `https://yourcustomdomain.com/terms` |
-| Authorized domains | `dmrmedia.org` AND your Vercel domain |
+| App logo | Upload DMR logo (square PNG, 120×120 min) |
+| App home page | `https://leads.dmrmedia.org/onboarding` |
+| App privacy policy | `https://leads.dmrmedia.org/privacy` |
+| App terms of service | `https://leads.dmrmedia.org/terms` |
+| Authorized domains | `dmrmedia.org` |
 | Developer contact email | `max@dmrmedia.org` |
 
 Click **Save and Continue**.
@@ -89,26 +92,34 @@ After this:
 ### 6a — Record the Required Video (~60 seconds)
 
 Google requires a screen recording showing:
-1. Navigate to your app's login/connect page
-2. Click "Connect Gmail" (the OAuth button)
-3. The Google consent screen appears showing the scopes (`gmail.send`, email, profile)
+1. Navigate to `https://leads.dmrmedia.org/onboarding` — show the homepage with the "Sign in with Google" button and the scope disclosure (`gmail.send`, never reads inbox)
+2. Click **Sign in with Google**
+3. The Google consent screen appears — pause so the reviewer can see all three scopes: `gmail.send`, email, profile
 4. Approve it
-5. Show that the app uses it to send an email
+5. Land on the client dashboard — show the **Live** status and "Sending via..." email address
+6. (Recommended) Show a conversation in the feed with a green **Sent** badge — proves the scope is actively used
 
-Upload the video to **YouTube** (can be unlisted).
+Upload the video to **YouTube** as **Unlisted** (not public). Copy the link.
 
 ### 6b — Submit the Verification Request
 
 1. On the OAuth consent screen page, click **Prepare for Verification**
 2. Fill in:
    - **YouTube link** to your demo video
-   - **Explanation of how you use each scope:**
-     - `gmail.send` → "Used to send automated buyer outreach emails on behalf of connected real estate agents to their leads"
-     - `userinfo.email` → "Used to identify which Google account is being connected"
-     - `userinfo.profile` → "Used to display the connected account's name in the dashboard"
+   - **Explanation of how you use each scope** — copy this exactly:
+
+**`gmail.send`:**
+> "Used to send automated personalized lead-response emails on behalf of connected real estate agents. When a new buyer or seller lead is received via webhook from the agent's lead generation platform (e.g. Luxury Presence), the system sends a single outbound email from the agent's own Gmail address to that lead. The agent's email is never read; only the send permission is used."
+
+**`userinfo.email`:**
+> "Used to identify which Google account is being connected, associate it with the correct agent profile in our system, and display the connected email address in the agent's dashboard."
+
+**`userinfo.profile`:**
+> "Used to pre-fill the agent's display name when they first connect their account."
+
 3. Click **Submit for Verification**
 
-Google will email you at the developer contact address with any questions.
+Google will email `max@dmrmedia.org` with any questions. Typical review time: 3–14 business days.
 
 ---
 
@@ -125,13 +136,20 @@ Google will email you at the developer contact address with any questions.
 ## Common Questions
 
 **Q: Do I need to re-connect everyone after publishing?**  
-No. Existing tokens keep working. Only people whose tokens expired (like Samantha) need to reconnect.
+No. Existing tokens keep working. Only people whose tokens already expired need to reconnect.
 
 **Q: What if Google asks for more info during review?**  
-They'll email `max@dmrmedia.org`. Usually they ask for clarification on scope usage — just describe what the app does honestly.
+They'll email `max@dmrmedia.org`. Usually they ask for clarification on scope usage — describe what the app does honestly. The scope justification text above is pre-written for this.
 
 **Q: Does the custom domain matter for verification?**  
-Yes — Google will verify that your privacy policy and homepage are live and accessible. Make sure the links work before submitting.
+Yes — Google will verify that your privacy policy and homepage are live and accessible from `leads.dmrmedia.org`. Make sure both URLs return 200 before submitting.
 
 **Q: Can I stay "unverified" permanently?**  
-Technically yes, but users will always see the scary warning. Fine for internal use; not ideal for external real estate agents.
+Technically yes, but users will always see the scary warning screen. Fine for internal use (Marquis team) right now. Not acceptable for external real estate agents you're onboarding at scale.
+
+**Q: What's the authorized redirect URI in GCP?**  
+Exactly: `https://leads.dmrmedia.org/auth/google/callback`  
+This is set automatically by `config.js` using `PUBLIC_BASE_URL`. If you add a custom domain in Vercel, update `PUBLIC_BASE_URL` and add the new redirect URI to the GCP OAuth client.
+
+**Q: For white-label deployments — do they need their own verification?**  
+Yes. Each brand needs its own Google Cloud project, OAuth app, and goes through the same verification process under their own app name and domain. See [dmr.md — Part 4](dmr.md#part-4--white-label--custom-crm-deployment) for the full white-label setup guide.

@@ -19,7 +19,7 @@ function defaultSettings() {
     buyer_sender_email: '',
     seller_sender_email: '',
     team_signature_enabled: false,
-    buyer_paused: false,
+    buyer_paused: true,
     seller_paused: false,
   };
 }

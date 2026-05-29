@@ -64,10 +64,6 @@
   <input class="input" type="email" name="cc_email" value="<%= s.cc_email || '' %>" placeholder="partner@example.com" />
   <p class="help">Leave blank for none. Copies a second agent or inbox on all outbound emails for this client.</p>
 
-  <label>SendGrid API key <span style="font-size:11px">(per-client override)</span></label>
-  <input class="input" name="sendgrid_api_key" value="<%= client.sendgrid_api_key || '' %>" placeholder="leave blank to use master key" />
-  <p class="help">If blank, the system master key is used. Stored encrypted (AES-256-GCM).</p>
-
   <h2>Campaign settings</h2>
   <div class="row">
     <div>
