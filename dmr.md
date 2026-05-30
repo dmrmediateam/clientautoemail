@@ -1,31 +1,31 @@
-Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git status ; git log --oneline -5
-
-Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git diff src/repos/clientSettings.js views/campaigns.ejs views/client_form.ejs
-
-All clean. Commit and push: 
-
-Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git add -A ; git commit -m "feat: segment buyer/seller campaigns, pause buyer by default
-
-- defaultSettings: buyer_paused: true (new clients start with buyer off)
-- Migrated all existing clients to buyer_paused=true via script
-- campaigns.ejs: buyer card desc notes it is paused by default
-- client_form.ejs: remove dead SendGrid API key field
-- docs: update GOOGLE_OAUTH_VERIFICATION.md and dmr.md
-- scripts: _promote-sam-gmail.js, _pause-all-buyer-campaigns.js"
-
-Ran terminal command: cd "C:\Users\Allied Gaming\Documents\GitHub\clientautoemail" ; git push origin main
-
-Pushed. Vercel is deploying now (usually ~60 seconds). While it builds, here's the exact step-by-step for Google verification:
 
 ---
 
-## Google Verification — Your Checklist
+## Google Verification — Status
 
-**Status right now:** App is in `Testing` mode → only listed test users can connect, tokens expire in 7 days.
+**Status as of May 29, 2026:** ✅ Submitted for verification — awaiting Google review.
 
-**Goal:** `Published → Verified` → no warnings, no expiry, anyone can connect.
+| Milestone | Status |
+|---|---|
+| App published (Testing → In production) | ✅ Done — May 29, 2026 |
+| Branding filled out in GCP | ✅ Done |
+| All 3 scopes added (`gmail.send`, `userinfo.email`, `userinfo.profile`) | ✅ Done |
+| Second GCP project owner added | ✅ Done |
+| Privacy policy updated (all scopes documented) | ✅ Done |
+| Terms of service updated | ✅ Done |
+| Onboarding page updated (name matches GCP exactly) | ✅ Done |
+| Token revocation on disconnect implemented | ✅ Done |
+| Demo video recorded + uploaded to YouTube (unlisted) | ✅ Done |
+| Verification form submitted | ✅ Done — May 29, 2026 |
+| Google approval received | ⏳ Awaiting — 3–14 business days |
+
+**What happens next:**
+- Google will email `max@dmrmedia.org` if they have questions
+- Once approved: "unverified app" warning disappears for all users
+- Tokens already do not expire (app is in production) — sending is working normally in the meantime
 
 ---
+
 
 ### Step 1 — Publish the app (do this RIGHT NOW, takes 2 minutes)
 
@@ -528,9 +528,12 @@ DATABASE_POOL_MAX=3                    # Neon connection pool (keep at 3 for ser
 
 ## Known Issues (As of May 29, 2026)
 
-| Issue | Impact | Action |
+| Issue | Impact | Status |
 |-------|--------|--------|
-| `samanthamarquishomes@gmail.com` — `connected=true`, no token | Confusing, not breaking | Delete from `users` table |
-| Marquis `buyer_sender_email` not set | Buyer emails send from client-level token (Linda) by default | Set to `linda.farwell@compass.com` explicitly so it's intentional |
-| Admin client form still has SendGrid API key field | UI noise — field is unused | Remove from `client_form.ejs` |
-| Webhook URL not shown in client dashboard | Agents can't self-configure | Add to `/dashboard` |
+| `samanthamarquishomes@gmail.com` — `connected=true`, no token | Confusing, not breaking | ⏳ Delete from `users` table |
+| Marquis `buyer_sender_email` not set | Buyer emails send from client-level token (Linda) by default | ⏳ Set to `linda.farwell@compass.com` in admin |
+| Webhook URL not shown in client dashboard | Agents can't self-configure | ✅ Fixed — visible in dashboard |
+| Disconnect only cleared client token, not user token | Google policy violation | ✅ Fixed May 29, 2026 |
+| Token not revoked on Google's servers on disconnect | Google API ToS violation | ✅ Fixed May 29, 2026 |
+| Privacy policy missing `userinfo.email` / `userinfo.profile` scope docs | Reviewer would flag | ✅ Fixed May 29, 2026 |
+| App name inconsistent between GCP and homepage | Caused previous verification rejection | ✅ Fixed May 29, 2026 |
